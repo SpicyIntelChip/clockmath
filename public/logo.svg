@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 80 80">
+  <circle cx="40" cy="40" r="39.5" fill="#ffffff" stroke="#1e293b" stroke-width="1"/>
+  <text x="40" y="15" text-anchor="middle" font-size="10" font-weight="700" fill="#059669">+</text>
+  <text x="65" y="45" text-anchor="middle" font-size="10" font-weight="700" fill="#059669">×</text>
+  <text x="40" y="70" text-anchor="middle" font-size="10" font-weight="700" fill="#ef4444">÷</text>
+  <text x="15" y="45" text-anchor="middle" font-size="10" font-weight="700" fill="#ef4444">−</text>
+  <line x1="40" y1="40" x2="40" y2="25" stroke="#059669" stroke-width="3" stroke-linecap="round"/>
+  <line x1="40" y1="40" x2="52" y2="40" stroke="#dc2626" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="40" cy="40" r="2" fill="#1e293b"/>
+  <text x="58" y="28" text-anchor="middle" font-size="8" font-weight="700" fill="#f59e0b">=</text>
+</svg>

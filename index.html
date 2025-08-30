@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Clock Math — Time Between Two Times</title>
+  <meta name="description" content="Calculate the time difference between two times (even across midnight). Fast, simple, mobile-friendly. Also shows decimal hours and minutes.">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <meta property="og:title" content="Clock Math — Time Between Two Times">
+  <meta property="og:description" content="Quickly compute elapsed time between two times. Handles crossing midnight; shows HH:MM:SS, minutes, and decimal hours.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://clockmath.com/">
+  <meta name="twitter:card" content="summary">
+  <style>
+    :root { --gap: 14px; --radius: 12px; --muted:#666; --border:#d7d7dc; --bg:#f7f7f8; }
+    * { box-sizing: border-box; }
+    html,body { height: 100%; }
+    body {
+      margin: 0; padding: 24px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.45; color: #111; background: var(--bg);
+    }
+    .card {
+      max-width: 760px; margin: 0 auto; background: #fff; border-radius: var(--radius);
+      box-shadow: 0 6px 24px rgba(0,0,0,.06); padding: 22px;
+    }
+    header { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+    .logo { width: 28px; height: 28px; }
+    h1 { font-size: 1.35rem; margin: 0; }
+    p.hint { margin: 6px 0 16px; color: var(--muted); }
+    .grid { display: grid; gap: var(--gap); grid-template-columns: 1fr; }
+    @media (min-width: 560px){ .grid { grid-template-columns: 1fr 1fr; } }
+    label { display:block; font-weight:600; margin-bottom:6px; }
+    input[type="time"] {
+      width: 100%; font-size: 1rem; padding: 10px 12px; border-radius: 8px;
+      border: 1px solid var(--border); background:#fff;
+    }
+    .row { display:flex; align-items:center; gap: 10px; flex-wrap: wrap; }
+    .small { font-size: .9rem; color: var(--muted); }
+    .out {
+      margin-top: 16px; padding: 14px; border: 1px dashed var(--border); border-radius: 10px;
+      background: #fafafa;
+    }
+    .out h2 { font-size: 1.05rem; margin: 0 0 8px; }
+    .kv { display:grid; grid-template-columns: 1fr auto; gap: 8px 12px; }
+    .pill {
+      display:inline-block; padding: 2px 8px; border-radius:999px; background:#eef2ff; color:#2b2b66;
+      font-size:.8rem; border: 1px solid #dfe6ff;
+    }
+    button, .linkbtn {
+      appearance:none; border:1px solid var(--border); background:#fff; color:#111; border-radius:8px;
+      padding:10px 14px; cursor:pointer; font-size:1rem; text-decoration:none; display:inline-flex; align-items:center; gap:8px;
+    }
+    button:hover, .linkbtn:hover { background:#f2f2f5; }
+    .footer { margin-top: 14px; display:flex; gap:10px; flex-wrap: wrap; align-items:center; }
+    .muted { color:var(--muted); font-size:.9rem; }
+    .divider { height:1px; background: var(--border); margin:18px 0; }
+    .flex { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; }
+  </style>
+</head>
+<body>
+  <main class="card" role="main">
+    <header>
+      <img class="logo" src="assets/favicon.svg" alt="" aria-hidden="true">
+      <h1>Clock Math</h1>
+    </header>
+    <p class="hint">Calculate the total time between two times. Handles crossing midnight automatically. Outputs HH:MM:SS, minutes, and decimal hours.</p>
+
+    <form id="calc" class="grid" aria-label="Time inputs">
+      <div>
+        <label for="start">Start time</label>
+        <input id="start" name="start" type="time" step="1" value="09:00:00" required>
+      </div>
+      <div>
+        <label for="end">End time</label>
+        <input id="end" name="end" type="time" step="1" value="17:30:00" required>
+      </div>
+    </form>
+
+    <div class="row" style="margin-top: var(--gap);">
+      <label class="row" style="gap:8px;">
+        <input id="assume-next-day" type="checkbox">
+        <span>Force “end is next day”</span>
+      </label>
+      <span class="small">If unchecked and end &lt; start, we’ll assume it goes past midnight automatically.</span>
+    </div>
+
+    <section class="out" aria-live="polite" aria-atomic="true">
+      <h2>Result</h2>
+      <div class="kv" id="result"></div>
+    </section>
+
+    <div class="footer">
+      <button id="copy" type="button" title="Copy result to clipboard">Copy result</button>
+      <button id="copy-link" type="button" title="Copy a shareable link">Copy shareable link</button>
+      <a id="share" class="linkbtn" href="#" role="button">Share</a>
+      <button id="clear" type="button">Clear</button>
+      <span class="muted">Tip: include seconds by typing “:30”.</span>
+    </div>
+
+    <div class="divider"></div>
+
+    <details>
+      <summary><strong>What’s shown</strong></summary>
+      <ul>
+        <li><span class="pill">HH:MM:SS</span> — formatted hours, minutes, seconds</li>
+        <li><span class="pill">Minutes</span> — total whole minutes</li>
+        <li><span class="pill">Decimal hours</span> — e.g., 2:30:00 → 2.5</li>
+        <li><span class="pill">Seconds</span> — total seconds</li>
+      </ul>
+    </details>
+
+    <p class="small muted">No data is sent anywhere unless you enable analytics in the code. Calculations happen in your browser.</p>
+  </main>
+
+  <script>
+    const $ = sel => document.querySelector(sel);
+    const startEl = $('#start');
+    const endEl = $('#end');
+    const nextDayEl = $('#assume-next-day');
+    const resultEl = $('#result');
+    const copyBtn = $('#copy');
+    const copyLinkBtn = $('#copy-link');
+    const shareBtn = $('#share');
+    const clearBtn = $('#clear');
+
+    function parseTimeToSeconds(str) {
+      if (!str) return NaN;
+      const parts = str.split(':');
+      if (parts.length < 2) return NaN;
+      const h = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      const s = parts[2] !== undefined ? parseInt(parts[2], 10) : 0;
+      if ([h,m,s].some(Number.isNaN)) return NaN;
+      return h*3600 + m*60 + s;
+    }
+
+    function formatHMS(totalSeconds) {
+      const sign = totalSeconds < 0 ? -1 : 1;
+      let s = Math.abs(Math.floor(totalSeconds));
+      const h = Math.floor(s / 3600);
+      s -= h * 3600;
+      const m = Math.floor(s / 60);
+      s -= m * 60;
+      const pad = n => String(n).padStart(2, '0');
+      return (sign < 0 ? '-' : '') + `${h}:${pad(m)}:${pad(s)}`;
+    }
+
+    function update() {
+      const s = parseTimeToSeconds(startEl.value);
+      const e = parseTimeToSeconds(endEl.value);
+      if (!Number.isFinite(s) || !Number.isFinite(e)) {
+        resultEl.innerHTML = `<span class="muted">Enter valid times to see the difference.</span>`;
+        return;
+      }
+      let end = e;
+      if (nextDayEl.checked) {
+        if (end <= s) end += 24*3600;
+      } else if (end < s) {
+        end += 24*3600;
+      }
+      const diff = end - s;
+      const minutes = Math.round(diff / 60);
+      const decimalHours = (diff / 3600);
+      const seconds = diff;
+
+      resultEl.innerHTML = `
+        <div>Start</div><div><code>${startEl.value || '—'}</code></div>
+        <div>End</div><div><code>${endEl.value || '—'}</code></div>
+        <div>Elapsed (HH:MM:SS)</div><div><strong>${formatHMS(diff)}</strong></div>
+        <div>Total minutes</div><div>${minutes.toLocaleString()}</div>
+        <div>Decimal hours</div><div>${decimalHours.toFixed(3)}</div>
+        <div>Total seconds</div><div>${seconds.toLocaleString()}</div>
+      `;
+
+      // Keep URL in sync (without reloading)
+      const params = new URLSearchParams();
+      params.set('start', startEl.value);
+      params.set('end', endEl.value);
+      if (nextDayEl.checked) params.set('next', '1');
+      const newUrl = `${location.pathname}?${params.toString()}`;
+      history.replaceState(null, '', newUrl);
+    }
+
+    function copy(text) {
+      return navigator.clipboard?.writeText(text);
+    }
+
+    function buildShareText() {
+      const s = parseTimeToSeconds(startEl.value);
+      const e = parseTimeToSeconds(endEl.value);
+      if (!Number.isFinite(s) || !Number.isFinite(e)) return 'Clock Math — time calculator';
+      let end = e;
+      if (nextDayEl.checked) { if (end <= s) end += 24*3600; }
+      else if (end < s) { end += 24*3600; }
+      const diff = end - s;
+      return `Clock Math result: ${formatHMS(diff)} (from ${startEl.value} to ${endEl.value}${end>=24*3600?' next day':''}) — https://clockmath.com`;
+    }
+
+    function buildShareLink() {
+      const url = new URL(location.href);
+      const params = new URLSearchParams();
+      if (startEl.value) params.set('start', startEl.value);
+      if (endEl.value) params.set('end', endEl.value);
+      if (nextDayEl.checked) params.set('next', '1');
+      url.search = params.toString();
+      return url.toString();
+    }
+
+    function applyParamsFromUrl() {
+      const url = new URL(location.href);
+      const p = url.searchParams;
+      if (p.get('start')) startEl.value = p.get('start');
+      if (p.get('end')) endEl.value = p.get('end');
+      nextDayEl.checked = p.get('next') === '1';
+    }
+
+    // Events
+    [startEl, endEl, nextDayEl].forEach(el => el.addEventListener('input', update));
+    copyBtn.addEventListener('click', async () => {
+      const s = resultEl.textContent.trim();
+      try {
+        await copy(s);
+        copyBtn.textContent = 'Copied!';
+        setTimeout(()=>copyBtn.textContent='Copy result', 1200);
+      } catch(e) { alert('Copy failed'); }
+    });
+    copyLinkBtn.addEventListener('click', async () => {
+      const link = buildShareLink();
+      try {
+        await copy(link);
+        copyLinkBtn.textContent = 'Link copied!';
+        setTimeout(()=>copyLinkBtn.textContent='Copy shareable link', 1200);
+      } catch(e) { alert('Copy failed'); }
+    });
+    shareBtn.addEventListener('click', async (ev) => {
+      ev.preventDefault();
+      const data = { title: 'Clock Math', text: buildShareText(), url: buildShareLink() };
+      if (navigator.share) {
+        try { await navigator.share(data); } catch {}
+      } else {
+        try {
+          await copy(data.url);
+          shareBtn.textContent = 'Link copied!';
+          setTimeout(()=>shareBtn.textContent='Share', 1200);
+        } catch {}
+      }
+    });
+    clearBtn.addEventListener('click', () => {
+      startEl.value = ''; endEl.value = ''; nextDayEl.checked = false; update();
+      history.replaceState(null, '', location.pathname);
+    });
+
+    applyParamsFromUrl();
+    update();
+  </script>
+</body>
+</html>
