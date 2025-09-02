@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react"
 import SeoIntro from "@/components/SeoIntro"
+import SiteFooter from "@/components/SiteFooter"
+import { event as gaEvent } from "@/lib/gtag"
 
 
 interface CalculationHistory {
@@ -11,6 +13,22 @@ interface CalculationHistory {
   assumeNextDay: boolean
   result: string
   timestamp: Date
+}
+
+function getDevice(): "mobile" | "desktop" {
+  if (typeof window === "undefined") return "desktop";
+  return window.matchMedia?.("(pointer: coarse)")?.matches ? "mobile" : "desktop";
+}
+
+function minutesBetween(start: Date, end: Date): { totalMin: number; overnight: boolean } {
+  const s = start.getTime();
+  let e = end.getTime();
+  let overnight = false;
+  if (e < s) {
+    e += 24 * 60 * 60 * 1000; // crossed midnight
+    overnight = true;
+  }
+  return { totalMin: Math.round((e - s) / 60000), overnight };
 }
 
 export default function ClockMathPage() {
@@ -27,6 +45,21 @@ export default function ClockMathPage() {
   const [activeTab, setActiveTab] = useState<"calculator" | "history">("calculator")
   const [calculatedResultHTML, setCalculatedResultHTML] = useState<string | null>(null);
   const [prominentElapsed, setProminentElapsed] = useState<string | null>(null);
+
+  // Emit debounced inputs_change (no PII)
+  const emitInputsChange = useCallback(() => {
+    gaEvent({
+      action: "inputs_change",
+      params: {
+        page: "calculator",
+        has_start: Boolean(startTime),
+        has_end: Boolean(endTime),
+        has_break: false, // This calculator doesn't have breaks, but keeping for consistency
+        device: getDevice(),
+        tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      },
+    });
+  }, [startTime, endTime]);
   
 
   useEffect(() => {
@@ -179,6 +212,30 @@ export default function ClockMathPage() {
 
     const { resultHTML, elapsed } = computeResultObject();
 
+    // Calculate GA4 metrics before setting state
+    const s = parseTimeToSeconds(startTime);
+    const e = parseTimeToSeconds(endTime);
+    let gaMetrics = {
+      minutes_total: 0,
+      hours_total: 0,
+      had_break: false,
+      overnight: false,
+    };
+
+    if (Number.isFinite(s) && Number.isFinite(e)) {
+      let end = e;
+      if (assumeNextDay) {
+        end += 24 * 3600;
+      } else if (end < s) {
+        end += 24 * 3600;
+        gaMetrics.overnight = true;
+      }
+      const diff = end - s;
+      gaMetrics.minutes_total = Math.round(diff / 60);
+      gaMetrics.hours_total = Number((diff / 3600).toFixed(2));
+      gaMetrics.overnight = gaMetrics.overnight || assumeNextDay;
+    }
+
     setTimeout(() => {
       setResult(resultHTML);
       setCalculatedResultHTML(resultHTML); // keep if you use it elsewhere (history, etc.)
@@ -187,6 +244,20 @@ export default function ClockMathPage() {
         saveToHistory(startTime, endTime, assumeNextDay, resultHTML);
       }
       setIsCalculating(false);
+
+      // GA4: calculate_submit with useful params (no PII)
+      gaEvent({
+        action: "calculate_submit",
+        params: {
+          page: "calculator",
+          minutes_total: gaMetrics.minutes_total,
+          hours_total: gaMetrics.hours_total,
+          had_break: gaMetrics.had_break,
+          overnight: gaMetrics.overnight,
+          device: getDevice(),
+          tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        },
+      });
     }, 200);
 
     // Update URL only on manual calculate
@@ -196,7 +267,7 @@ export default function ClockMathPage() {
     if (assumeNextDay) params.set("next", "1");
     const newUrl = `${window.location.pathname}?${params.toString()}`;
     window.history.replaceState(null, "", newUrl);
-  }, [startTime, endTime, assumeNextDay, validateTimeInput, parseTimeToSeconds, formatHMS, formatTimeDisplay]);
+  }, [startTime, endTime, assumeNextDay, validateTimeInput, parseTimeToSeconds, formatHMS, formatTimeDisplay, saveToHistory]);
 
   const clearHistory = useCallback(() => {
     setHistory([])
@@ -250,8 +321,16 @@ export default function ClockMathPage() {
           btn.textContent = "Copy result"
         }, 1200)
       }
+      gaEvent({
+        action: "copy_result",
+        params: { page: "calculator", has_result: Boolean(resultText), device: getDevice() },
+      });
     } else {
       alert("Copy failed")
+      gaEvent({
+        action: "copy_result",
+        params: { page: "calculator", has_result: Boolean(resultText), device: getDevice(), error: "clipboard" },
+      });
     }
   }
 
@@ -309,8 +388,10 @@ export default function ClockMathPage() {
     if (navigator.share) {
       try {
         await navigator.share(shareData)
+        gaEvent({ action: "share_click", params: { page: "calculator", method: "web_share" } });
       } catch {
         // Share cancelled or failed
+        gaEvent({ action: "share_click", params: { page: "calculator", method: "web_share_cancel" } });
       }
     } else {
       const success = await copyToClipboard(shareUrl)
@@ -323,6 +404,7 @@ export default function ClockMathPage() {
           }, 1200)
         }
       }
+      gaEvent({ action: "share_click", params: { page: "calculator", method: "fallback" } });
     }
   }
 
@@ -535,7 +617,7 @@ export default function ClockMathPage() {
                         type="time"
                         step="1"
                         value={startTime}
-                        onChange={(e) => setStartTime(e.target.value)}
+                        onChange={(e) => { setStartTime(e.target.value); emitInputsChange(); }}
                         className={`w-full px-3 sm:px-4 py-3 sm:py-4 bg-input dark:bg-slate-700 border-2 ${
                           startTimeValid ? "border-border dark:border-slate-600" : "border-red-500 dark:border-red-400"
                         } rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 text-base sm:text-lg font-mono shadow-sm dark:text-slate-100`}
@@ -558,7 +640,7 @@ export default function ClockMathPage() {
                         type="time"
                         step="1"
                         value={endTime}
-                        onChange={(e) => setEndTime(e.target.value)}
+                        onChange={(e) => { setEndTime(e.target.value); emitInputsChange(); }}
                         className={`w-full px-3 sm:px-4 py-3 sm:py-4 bg-input dark:bg-slate-700 border-2 ${
                           endTimeValid ? "border-border dark:border-slate-600" : "border-red-500 dark:border-red-400"
                         } rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 text-base sm:text-lg font-mono shadow-sm dark:text-slate-100`}
@@ -579,7 +661,7 @@ export default function ClockMathPage() {
                     id="assume-next-day"
                     type="checkbox"
                     checked={assumeNextDay}
-                    onChange={(e) => setAssumeNextDay(e.target.checked)}
+                    onChange={(e) => { setAssumeNextDay(e.target.checked); emitInputsChange(); }}
                     className="mt-1 w-4 h-4 text-primary bg-input dark:bg-slate-700 border-2 border-border dark:border-slate-600 rounded focus:ring-primary focus:ring-2 shrink-0"
                   />
                   <div className="flex-1 min-w-0">
@@ -802,48 +884,94 @@ export default function ClockMathPage() {
           </div>
         </div>
 
-        <footer className="mt-8 sm:mt-12">
-  <div className="bg-card/60 dark:bg-slate-800/60 backdrop-blur-sm rounded-2xl p-4 sm:p-6 shadow-lg border border-border/50 dark:border-slate-700/50 text-center">
-    <p className="text-sm text-muted-foreground dark:text-slate-400 mb-4">
-      Find Clock Math useful? Support the development!
-    </p>
+        {/* Resources Section */}
+        <div className="mt-8 sm:mt-12 bg-card/60 dark:bg-slate-800/60 backdrop-blur-sm rounded-2xl p-4 sm:p-6 shadow-lg border border-border/50 dark:border-slate-700/50">
+          <h3 className="text-lg font-bold text-foreground dark:text-slate-100 mb-4 flex items-center gap-2">
+            <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C20.832 18.477 19.246 18 17.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
+            📚 Time Calculation Resources
+          </h3>
+          <p className="text-sm text-muted-foreground dark:text-slate-400 mb-4">
+            Learn more about time calculations with our helpful guides and tutorials.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <a
+              href="/articles/work-hours-calculator"
+              onClick={() => gaEvent({ action: "cta_article_click", params: { page: "calculator", article: "work-hours-calculator" } })}
+              className="p-3 bg-gradient-to-r from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 rounded-lg border border-emerald-200 dark:border-emerald-800 hover:shadow-md transition-all duration-200 group"
+            >
+              <h4 className="font-semibold text-emerald-800 dark:text-emerald-200 text-sm group-hover:text-emerald-600 dark:group-hover:text-emerald-100">
+                Calculate Work Hours
+              </h4>
+              <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1">
+                Track employee hours and payroll calculations
+              </p>
+            </a>
+            <a
+              href="/articles/sleep-hours-calculator"
+              onClick={() => gaEvent({ action: "cta_article_click", params: { page: "calculator", article: "sleep-hours-calculator" } })}
+              className="p-3 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-lg border border-blue-200 dark:border-blue-800 hover:shadow-md transition-all duration-200 group"
+            >
+              <h4 className="font-semibold text-blue-800 dark:text-blue-200 text-sm group-hover:text-blue-600 dark:group-hover:text-blue-100">
+                Sleep Hours Calculator
+              </h4>
+              <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                Track your sleep duration and patterns
+              </p>
+            </a>
+            <a
+              href="/articles/overtime-hours-calculator"
+              onClick={() => gaEvent({ action: "cta_article_click", params: { page: "calculator", article: "overtime-hours-calculator" } })}
+              className="p-3 bg-gradient-to-r from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20 rounded-lg border border-amber-200 dark:border-amber-800 hover:shadow-md transition-all duration-200 group"
+            >
+              <h4 className="font-semibold text-amber-800 dark:text-amber-200 text-sm group-hover:text-amber-600 dark:group-hover:text-amber-100">
+                Overtime Calculator
+              </h4>
+              <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                Calculate overtime pay and hours worked
+              </p>
+            </a>
+            <a
+              href="/articles/study-time-calculator"
+              onClick={() => gaEvent({ action: "cta_article_click", params: { page: "calculator", article: "study-time-calculator" } })}
+              className="p-3 bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-lg border border-purple-200 dark:border-purple-800 hover:shadow-md transition-all duration-200 group"
+            >
+              <h4 className="font-semibold text-purple-800 dark:text-purple-200 text-sm group-hover:text-purple-600 dark:group-hover:text-purple-100">
+                Study Time Tracker
+              </h4>
+              <p className="text-xs text-purple-700 dark:text-purple-300 mt-1">
+                Measure and optimize your study sessions
+              </p>
+            </a>
+            <a
+              href="/articles/time-between-dates-calculator"
+              onClick={() => gaEvent({ action: "cta_article_click", params: { page: "calculator", article: "time-between-dates-calculator" } })}
+              className="p-3 bg-gradient-to-r from-rose-50 to-rose-100 dark:from-rose-900/20 dark:to-rose-800/20 rounded-lg border border-rose-200 dark:border-rose-800 hover:shadow-md transition-all duration-200 group"
+            >
+              <h4 className="font-semibold text-rose-800 dark:text-rose-200 text-sm group-hover:text-rose-600 dark:group-hover:text-rose-100">
+                Time Between Dates
+              </h4>
+              <p className="text-xs text-rose-700 dark:text-rose-300 mt-1">
+                Calculate duration between any two dates
+              </p>
+            </a>
+            <a
+              href="/articles/hours-calculator-online"
+              onClick={() => gaEvent({ action: "cta_article_click", params: { page: "calculator", article: "hours-calculator-online" } })}
+              className="p-3 bg-gradient-to-r from-teal-50 to-teal-100 dark:from-teal-900/20 dark:to-teal-800/20 rounded-lg border border-teal-200 dark:border-teal-800 hover:shadow-md transition-all duration-200 group"
+            >
+              <h4 className="font-semibold text-teal-800 dark:text-teal-200 text-sm group-hover:text-teal-600 dark:group-hover:text-teal-100">
+                Online vs Manual Math
+              </h4>
+              <p className="text-xs text-teal-700 dark:text-teal-300 mt-1">
+                Why online calculators beat manual calculations
+              </p>
+            </a>
+          </div>
+        </div>
 
-    {/* BMC button (unchanged) */}
-    <a
-      href="https://www.buymeacoffee.com/clockmath?utm_source=clockmath&utm_medium=site&utm_campaign=footer_button"
-      target="_blank"
-      rel="noopener noreferrer"
-      className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-medium rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
-      aria-label="Support Clock Math on Buy Me a Coffee"
-    >
-      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d="M2 19h18v2H2v-2zM20 3H4v10c0 2.21 1.79 4 4 4h6c2.21 0 4-1.79 4-4v-3h2c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zM20 8h-2V5h2v3zM4 5h12v8c0 1.1-.9 2-2 2H8c-1.1 0-2-.9-2-2V5z" />
-        <path d="M7 3.5c0-.3.2-.5.5-.5s.5.2.5.5c0 .8-.2 1.2-.5 1.5-.3-.3-.5-.7-.5-1.5z" opacity="0.8" />
-        <path d="M10 2.8c0-.4.2-.8.5-.8s.5.4.5.8c0 1-.3 1.5-.5 1.8-.2-.3-.3-.5-.3-1.8 0-.4.1-.7.1-.7z" opacity="0.9" />
-        <path d="M13 3.2c0-.3.2-.7.5-.7s.5.4.5.7c0 .9-.2 1.3-.5 1.6-.3-.3-.5-.7-.5-1.6z" opacity="0.7" />
-        <path d="M8 1.8c.3 0 .5.3.5.7 0 .6-.1.9-.3 1.1-.2-.2-.3-.5-.3-1.1 0-.4.1-.7.1-.7z" opacity="0.6" />
-        <path d="M11.5 1.5c.2 0 .4.2.4.6 0 .7-.2 1-.4 1.2-.2-.2-.4-.5-.4-1.2 0-.4.2-.6.4-.6z" opacity="0.8" />
-      </svg>
-      Buy Me a Coffee
-    </a>
-
-    {/* Contact + site links */}
-    <div className="mt-4 text-xs sm:text-sm text-muted-foreground dark:text-slate-400">
-      <a
-        href="mailto:hello@clockmath.com?subject=Clock%20Math%20feedback"
-        className="underline underline-offset-4 hover:text-foreground"
-      >
-        hello@clockmath.com
-      </a>
-      <span className="mx-2">·</span>
-      <a href="https://clockmath.com" className="hover:text-foreground">clockmath.com</a>
-    </div>
-
-    <div className="mt-2 text-xs text-muted-foreground dark:text-slate-500 opacity-75">
-      © {new Date().getFullYear()} Clock Math
-    </div>
-  </div>
-</footer>
+        <SiteFooter />
       </main>
     </div>
   )
