@@ -3,7 +3,7 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import { Metadata } from "next";
-import GoogleAnalytics from "../components/GoogleAnalytics";
+import Analytics from "@/components/Analytics";
 
   
 
@@ -45,12 +45,10 @@ export const metadata: Metadata = {
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_ID;
-
   return (
     <html lang="en">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
-        {GA_MEASUREMENT_ID && <GoogleAnalytics ga_id={GA_MEASUREMENT_ID} />}
+        <Analytics />
         {children}
       </body>
     </html>
