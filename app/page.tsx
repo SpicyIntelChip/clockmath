@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import SeoIntro from "@/components/SeoIntro"
 import SiteFooter from "@/components/SiteFooter"
+import ToolsNavigation from "@/components/ToolsNavigation"
 import { event as gaEvent } from "@/lib/gtag"
 
 
@@ -42,7 +43,7 @@ export default function ClockMathPage() {
   const [isCalculating, setIsCalculating] = useState(false)
   const [startTimeValid, setStartTimeValid] = useState(true)
   const [endTimeValid, setEndTimeValid] = useState(true)
-  const [activeTab, setActiveTab] = useState<"calculator" | "history">("calculator")
+  // Removed activeTab state since we no longer have tab switching
   const [calculatedResultHTML, setCalculatedResultHTML] = useState<string | null>(null);
   const [prominentElapsed, setProminentElapsed] = useState<string | null>(null);
 
@@ -91,26 +92,6 @@ export default function ClockMathPage() {
     return h * 3600 + m * 60 + s
   }, [])
 
-  const validateTimeInput = useCallback(
-    (timeStr: string): boolean => {
-      if (!timeStr) return false
-      const seconds = parseTimeToSeconds(timeStr)
-      return Number.isFinite(seconds)
-    },
-    [parseTimeToSeconds],
-  )
-
-  const formatHMS = useCallback((totalSeconds: number): string => {
-    const sign = totalSeconds < 0 ? -1 : 1
-    let s = Math.abs(Math.floor(totalSeconds))
-    const h = Math.floor(s / 3600)
-    s -= h * 3600
-    const m = Math.floor(s / 60)
-    s -= m * 60
-    const pad = (n: number) => String(n).padStart(2, "0")
-    return (sign < 0 ? "-" : "") + `${h}:${pad(m)}:${pad(s)}`
-  }, [])
-
   const formatTimeDisplay = useCallback(
     (timeStr: string): string => {
       if (!timeStr || !is24HourFormat) {
@@ -126,6 +107,94 @@ export default function ClockMathPage() {
     },
     [is24HourFormat],
   )
+
+  const convertTo24Hour = useCallback((input: string): string => {
+    if (!input) return ""
+    
+    // Remove extra spaces and normalize
+    const cleaned = input.trim().toUpperCase().replace(/\s+/g, ' ')
+    
+    // Match patterns like "1:30 PM", "1:30:45 AM", "13:30", "9 AM", etc.
+    const patterns = [
+      // 12-hour format with AM/PM - full format
+      /^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)$/,
+      // 12-hour format with AM/PM - hour only
+      /^(\d{1,2})\s*(AM|PM)$/,
+      // 24-hour format (just pass through after validation)
+      /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/
+    ]
+    
+    for (const pattern of patterns) {
+      const match = cleaned.match(pattern)
+      if (!match) continue
+      
+      let hours = Number.parseInt(match[1], 10)
+      let minutes = 0
+      let seconds = 0
+      let period = ""
+      
+      // Check which pattern matched
+      if (match[4]) {
+        // Full format: 1:30:45 AM or 1:30 AM
+        minutes = Number.parseInt(match[2], 10)
+        seconds = match[3] ? Number.parseInt(match[3], 10) : 0
+        period = match[4]
+      } else if (match[2] && (match[2] === "AM" || match[2] === "PM")) {
+        // Hour-only format: 9 AM
+        period = match[2]
+      } else if (match[2]) {
+        // 24-hour format: 13:30 or 13:30:45
+        minutes = Number.parseInt(match[2], 10)
+        seconds = match[3] ? Number.parseInt(match[3], 10) : 0
+      }
+      
+      // Validate ranges
+      if (minutes > 59 || seconds > 59) continue
+      
+      if (period && (period === "AM" || period === "PM")) {
+        // 12-hour format conversion
+        if (hours < 1 || hours > 12) continue
+        if (period === "PM" && hours !== 12) hours += 12
+        if (period === "AM" && hours === 12) hours = 0
+      } else {
+        // 24-hour format validation
+        if (hours > 23) continue
+      }
+      
+      // Format as HH:MM:SS
+      return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`
+    }
+    
+    return "" // Invalid format
+  }, [])
+
+  const validateTimeInput = useCallback(
+    (timeStr: string): boolean => {
+      if (!timeStr) return false
+      
+      // In 12-hour mode, validate the displayed format, then convert and validate
+      if (!is24HourFormat) {
+        const converted = convertTo24Hour(formatTimeDisplay(timeStr))
+        return converted !== ""
+      }
+      
+      // In 24-hour mode, use the existing validation
+      const seconds = parseTimeToSeconds(timeStr)
+      return Number.isFinite(seconds)
+    },
+    [parseTimeToSeconds, is24HourFormat, convertTo24Hour, formatTimeDisplay],
+  )
+
+  const formatHMS = useCallback((totalSeconds: number): string => {
+    const sign = totalSeconds < 0 ? -1 : 1
+    let s = Math.abs(Math.floor(totalSeconds))
+    const h = Math.floor(s / 3600)
+    s -= h * 3600
+    const m = Math.floor(s / 60)
+    s -= m * 60
+    const pad = (n: number) => String(n).padStart(2, "0")
+    return (sign < 0 ? "-" : "") + `${h}:${pad(m)}:${pad(s)}`
+  }, [])
 
   const saveToHistory = useCallback((start: string, end: string, nextDay: boolean, resultHtml: string) => {
     const newCalculation: CalculationHistory = {
@@ -549,38 +618,14 @@ export default function ClockMathPage() {
           </div>
         </header>
 
-        <div className="lg:hidden mb-6">
-          <div className="bg-card/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl p-1 shadow-xl border border-border/50 dark:border-slate-700/50">
-            <div className="flex">
-              <button
-                onClick={() => setActiveTab("calculator")}
-                className={`flex-1 px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 ${
-                  activeTab === "calculator"
-                    ? "bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Time Calculator
-              </button>
-              <button
-                onClick={() => setActiveTab("history")}
-                className={`flex-1 px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 ${
-                  activeTab === "history"
-                    ? "bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Recent Calculations
-                {history.length > 0 && (
-                  <span className="ml-2 px-2 py-0.5 bg-primary/20 text-xs rounded-full">{history.length}</span>
-                )}
-              </button>
-            </div>
-          </div>
+        <div className="mb-6">
+          <ToolsNavigation 
+            currentTool="calculator"
+          />
         </div>
 
         <div className="space-y-6 lg:space-y-0 lg:grid lg:grid-cols-3 lg:gap-8">
-          <div className={`lg:col-span-2 ${activeTab === "history" ? "hidden lg:block" : ""}`}>
+          <div className="lg:col-span-2">
             <div className="bg-card/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl p-4 sm:p-6 lg:p-8 shadow-xl border border-border/50 dark:border-slate-700/50 hover:shadow-2xl transition-all duration-300">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
                 <div>
@@ -611,18 +656,40 @@ export default function ClockMathPage() {
                       Start Time
                     </label>
                     <div className="relative">
-                      <input
-                        id="start"
-                        name="start"
-                        type="time"
-                        step="1"
-                        value={startTime}
-                        onChange={(e) => { setStartTime(e.target.value); emitInputsChange(); }}
-                        className={`w-full px-3 sm:px-4 py-3 sm:py-4 bg-input dark:bg-slate-700 border-2 ${
-                          startTimeValid ? "border-border dark:border-slate-600" : "border-red-500 dark:border-red-400"
-                        } rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 text-base sm:text-lg font-mono shadow-sm dark:text-slate-100`}
-                        required
-                      />
+                      {is24HourFormat ? (
+                        <input
+                          id="start"
+                          name="start"
+                          type="time"
+                          step="1"
+                          value={startTime}
+                          onChange={(e) => { setStartTime(e.target.value); emitInputsChange(); }}
+                          className={`w-full px-3 sm:px-4 py-3 sm:py-4 bg-input dark:bg-slate-700 border-2 ${
+                            startTimeValid ? "border-border dark:border-slate-600" : "border-red-500 dark:border-red-400"
+                          } rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 text-base sm:text-lg font-mono shadow-sm dark:text-slate-100`}
+                          required
+                        />
+                      ) : (
+                        <input
+                          id="start"
+                          name="start"
+                          type="text"
+                          placeholder="9:00 AM"
+                          value={startTime ? formatTimeDisplay(startTime) : ""}
+                          onChange={(e) => {
+                            const input = e.target.value;
+                            const converted = convertTo24Hour(input);
+                            if (converted || !input) {
+                              setStartTime(converted || "");
+                              emitInputsChange();
+                            }
+                          }}
+                          className={`w-full px-3 sm:px-4 py-3 sm:py-4 bg-input dark:bg-slate-700 border-2 ${
+                            startTimeValid ? "border-border dark:border-slate-600" : "border-red-500 dark:border-red-400"
+                          } rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 text-base sm:text-lg font-mono shadow-sm dark:text-slate-100`}
+                          required
+                        />
+                      )}
                       <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-primary/5 to-accent/5 pointer-events-none" />
                     </div>
                   </div>
@@ -634,18 +701,40 @@ export default function ClockMathPage() {
                       End Time
                     </label>
                     <div className="relative">
-                      <input
-                        id="end"
-                        name="end"
-                        type="time"
-                        step="1"
-                        value={endTime}
-                        onChange={(e) => { setEndTime(e.target.value); emitInputsChange(); }}
-                        className={`w-full px-3 sm:px-4 py-3 sm:py-4 bg-input dark:bg-slate-700 border-2 ${
-                          endTimeValid ? "border-border dark:border-slate-600" : "border-red-500 dark:border-red-400"
-                        } rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 text-base sm:text-lg font-mono shadow-sm dark:text-slate-100`}
-                        required
-                      />
+                      {is24HourFormat ? (
+                        <input
+                          id="end"
+                          name="end"
+                          type="time"
+                          step="1"
+                          value={endTime}
+                          onChange={(e) => { setEndTime(e.target.value); emitInputsChange(); }}
+                          className={`w-full px-3 sm:px-4 py-3 sm:py-4 bg-input dark:bg-slate-700 border-2 ${
+                            endTimeValid ? "border-border dark:border-slate-600" : "border-red-500 dark:border-red-400"
+                          } rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 text-base sm:text-lg font-mono shadow-sm dark:text-slate-100`}
+                          required
+                        />
+                      ) : (
+                        <input
+                          id="end"
+                          name="end"
+                          type="text"
+                          placeholder="9:00 AM"
+                          value={endTime ? formatTimeDisplay(endTime) : ""}
+                          onChange={(e) => {
+                            const input = e.target.value;
+                            const converted = convertTo24Hour(input);
+                            if (converted || !input) {
+                              setEndTime(converted || "");
+                              emitInputsChange();
+                            }
+                          }}
+                          className={`w-full px-3 sm:px-4 py-3 sm:py-4 bg-input dark:bg-slate-700 border-2 ${
+                            endTimeValid ? "border-border dark:border-slate-600" : "border-red-500 dark:border-red-400"
+                          } rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 text-base sm:text-lg font-mono shadow-sm dark:text-slate-100`}
+                          required
+                        />
+                      )}
                       <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-primary/5 to-accent/5 pointer-events-none" />
                       {assumeNextDay && (
                         <span className="absolute z-10 right-3 top-2 text-[11px] sm:text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-300/50">
@@ -763,7 +852,7 @@ export default function ClockMathPage() {
             </div>
           </div>
 
-          <div className={`lg:col-span-1 ${activeTab === "calculator" ? "hidden lg:block" : ""}`}>
+          <div className="lg:col-span-1 hidden lg:block">
             <div className="bg-card/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl p-4 sm:p-6 shadow-xl border border-border/50 dark:border-slate-700/50 hover:shadow-2xl transition-all duration-300">
               <div className="flex items-center justify-between mb-4 sm:mb-6">
                 <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -884,18 +973,23 @@ export default function ClockMathPage() {
           </div>
         </div>
 
-        {/* Resources Section */}
+        {/* Tools & Resources Section */}
         <div className="mt-8 sm:mt-12 bg-card/60 dark:bg-slate-800/60 backdrop-blur-sm rounded-2xl p-4 sm:p-6 shadow-lg border border-border/50 dark:border-slate-700/50">
           <h3 className="text-lg font-bold text-foreground dark:text-slate-100 mb-4 flex items-center gap-2">
             <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C20.832 18.477 19.246 18 17.5 18c-1.746 0-3.332.477-4.5 1.253" />
             </svg>
-            📚 Time Calculation Resources
+📚 Calculation Guides & Articles
           </h3>
-          <p className="text-sm text-muted-foreground dark:text-slate-400 mb-4">
-            Learn more about time calculations with our helpful guides and tutorials.
-          </p>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          
+
+          {/* Resources Section */}
+          <div>
+            <h4 className="text-base font-semibold text-foreground dark:text-slate-100 mb-3">Calculation Guides</h4>
+            <p className="text-sm text-muted-foreground dark:text-slate-400 mb-4">
+              Learn more about time calculations with our helpful guides and tutorials.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <a
               href="/articles/work-hours-calculator"
               onClick={() => gaEvent({ action: "cta_article_click", params: { page: "calculator", article: "work-hours-calculator" } })}
@@ -968,6 +1062,67 @@ export default function ClockMathPage() {
                 Why online calculators beat manual calculations
               </p>
             </a>
+            <a
+              href="/articles/timezone-converter-remote-work-meetings"
+              onClick={() => gaEvent({ action: "cta_article_click", params: { page: "calculator", article: "timezone-converter-remote-work-meetings" } })}
+              className="p-3 bg-gradient-to-r from-indigo-50 to-indigo-100 dark:from-indigo-900/20 dark:to-indigo-800/20 rounded-lg border border-indigo-200 dark:border-indigo-800 hover:shadow-md transition-all duration-200 group"
+            >
+              <h4 className="font-semibold text-indigo-800 dark:text-indigo-200 text-sm group-hover:text-indigo-600 dark:group-hover:text-indigo-100">
+                Remote Work Timezones
+              </h4>
+              <p className="text-xs text-indigo-700 dark:text-indigo-300 mt-1">
+                Schedule global meetings without confusion
+              </p>
+            </a>
+            <a
+              href="/articles/travel-timezone-converter"
+              onClick={() => gaEvent({ action: "cta_article_click", params: { page: "calculator", article: "travel-timezone-converter" } })}
+              className="p-3 bg-gradient-to-r from-cyan-50 to-cyan-100 dark:from-cyan-900/20 dark:to-cyan-800/20 rounded-lg border border-cyan-200 dark:border-cyan-800 hover:shadow-md transition-all duration-200 group"
+            >
+              <h4 className="font-semibold text-cyan-800 dark:text-cyan-200 text-sm group-hover:text-cyan-600 dark:group-hover:text-cyan-100">
+                Travel Time Planning
+              </h4>
+              <p className="text-xs text-cyan-700 dark:text-cyan-300 mt-1">
+                Plan international trips with timezone conversion
+              </p>
+            </a>
+            <a
+              href="/articles/timezone-converter-gaming-events"
+              onClick={() => gaEvent({ action: "cta_article_click", params: { page: "calculator", article: "timezone-converter-gaming-events" } })}
+              className="p-3 bg-gradient-to-r from-violet-50 to-violet-100 dark:from-violet-900/20 dark:to-violet-800/20 rounded-lg border border-violet-200 dark:border-violet-800 hover:shadow-md transition-all duration-200 group"
+            >
+              <h4 className="font-semibold text-violet-800 dark:text-violet-200 text-sm group-hover:text-violet-600 dark:group-hover:text-violet-100">
+                Gaming & Esports Times
+              </h4>
+              <p className="text-xs text-violet-700 dark:text-violet-300 mt-1">
+                Never miss game releases or tournaments
+              </p>
+            </a>
+            <a
+              href="/articles/stock-market-timezone-converter"
+              onClick={() => gaEvent({ action: "cta_article_click", params: { page: "calculator", article: "stock-market-timezone-converter" } })}
+              className="p-3 bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-lg border border-green-200 dark:border-green-800 hover:shadow-md transition-all duration-200 group"
+            >
+              <h4 className="font-semibold text-green-800 dark:text-green-200 text-sm group-hover:text-green-600 dark:group-hover:text-green-100">
+                Stock Market Hours
+              </h4>
+              <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                Track global market opens and closes
+              </p>
+            </a>
+            <a
+              href="/articles/timezone-converter-family-calls"
+              onClick={() => gaEvent({ action: "cta_article_click", params: { page: "calculator", article: "timezone-converter-family-calls" } })}
+              className="p-3 bg-gradient-to-r from-pink-50 to-pink-100 dark:from-pink-900/20 dark:to-pink-800/20 rounded-lg border border-pink-200 dark:border-pink-800 hover:shadow-md transition-all duration-200 group"
+            >
+              <h4 className="font-semibold text-pink-800 dark:text-pink-200 text-sm group-hover:text-pink-600 dark:group-hover:text-pink-100">
+                Family & Friends Calls
+              </h4>
+              <p className="text-xs text-pink-700 dark:text-pink-300 mt-1">
+                Perfect timing for international calls
+              </p>
+            </a>
+            </div>
           </div>
         </div>
 
