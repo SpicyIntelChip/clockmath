@@ -6,5 +6,6 @@ compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = ".vercel/output/static"
 
 [vars]
-# Replace with your actual GA4 Measurement ID (format: G-XXXXXXXXXX)
-NEXT_PUBLIC_GA_ID = "G-64971C9L15"
+NEXT_PUBLIC_GA_ID = "G-5L3QN6938D"
+GEOAPIFY_KEY="***REMOVED***"
+
