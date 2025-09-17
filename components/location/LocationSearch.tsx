@@ -64,7 +64,7 @@ export function LocationSearch({
     const t = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/places?q=${encodeURIComponent(q)}`, {
+        const res = await fetch(`https://clockmath.com/api/places?q=${encodeURIComponent(q)}`, {
           signal: ac.signal,
         });
         if (!res.ok) throw new Error("bad");
