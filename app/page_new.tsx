@@ -261,7 +261,7 @@ export default function ClockMathPage() {
   }, [startTime, endTime, validateTime])
 
   // Debounced inputs change event
-  const debouncedInputsChange = useRef<NodeJS.Timeout | null>(null)
+  const debouncedInputsChange = useRef<NodeJS.Timeout>()
   useEffect(() => {
     if (debouncedInputsChange.current) {
       clearTimeout(debouncedInputsChange.current)
@@ -474,30 +474,9 @@ export default function ClockMathPage() {
         {/* History */}
         {history.length > 0 && (
           <div className="bg-card/60 dark:bg-slate-800/60 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-border/50 dark:border-slate-700/50">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-foreground dark:text-slate-100">
-                Recent Calculations
-              </h3>
-              <button
-                onClick={() => {
-                  setHistory([]);
-                  localStorage.removeItem("clockmath-history");
-                  gaEvent({
-                    action: "history_cleared",
-                    params: {
-                      page: "calculator",
-                      device: getDevice(),
-                    },
-                  });
-                }}
-                className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground bg-muted/50 hover:bg-muted dark:bg-slate-700/50 dark:hover:bg-slate-600 rounded-lg transition-colors"
-                title="Clear all calculation history"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
-            </div>
+            <h3 className="text-lg font-bold text-foreground dark:text-slate-100 mb-4">
+              Recent Calculations
+            </h3>
             <div className="grid gap-3">
               {history.slice(0, 5).map((entry) => (
                 <div
@@ -538,7 +517,7 @@ export default function ClockMathPage() {
           />
         )}
 
-        <SeoIntro />
+        <SeoIntro prominentElapsed={prominentElapsed} />
         <SiteFooter />
       </div>
     </PageChrome>

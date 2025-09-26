@@ -9,15 +9,16 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { LocationTimezonePicker } from '@/components/location/LocationTimezonePicker';
-  import { 
-    getUserTimeZone, 
-    getTimeZoneOptions, 
-    formatZoned, 
-    convertDateBetweenZones,
-    parseDateTimeInZone,
-    getTimezoneOffset,
-    getOffsetLabel
-  } from '@/lib/time';
+import { CustomTimePicker } from '@/components/ui/CustomTimePicker';
+import {
+  getUserTimeZone,
+  getTimeZoneOptions,
+  formatZoned,
+  convertDateBetweenZones,
+  parseDateTimeInZone,
+  getTimezoneOffset,
+  getOffsetLabel,
+} from '@/lib/time';
 import { ArrowLeftRight, Clock, Calendar, MapPin } from 'lucide-react';
 import { event as gaEvent } from '@/lib/gtag';
 import { toast } from '@/hooks/use-toast';
@@ -41,6 +42,9 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
     to: ReturnType<typeof formatZoned>;
     targetDate: Date;
   } | null>(null);
+  
+  // Custom time picker state
+  const [showCustomTimePicker, setShowCustomTimePicker] = useState(false);
 
   const timeZoneOptions = useMemo(() => getTimeZoneOptions(), []);
 
@@ -129,7 +133,7 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
       console.error('Error converting timezone:', error);
       setResult(null);
     }
-  }, [hour12]);
+  }, [hour12, inputDate, inputTime]);
 
   // Calculate conversion manually when user clicks Calculate
   const handleCalculate = useCallback(() => {
@@ -176,8 +180,8 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
         setInputTime(timeStr);
         // Recompute using the swapped zones and the carried-over time
         computeConversion(newFrom, newTo, { dateStr, timeStr });
-      } catch (e) {
-        // Fallback: recompute with existing inputs
+      } catch (error) {
+        console.warn('Failed to reuse swapped result timestamp:', error);
         computeConversion(newFrom, newTo);
       }
     } else {
@@ -347,6 +351,82 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
     }
   };
 
+  // Helper functions for time format conversion
+  const convertTo24Hour = useCallback((time12h: string): string => {
+    if (!time12h) return "";
+    
+    const time = time12h.trim().toUpperCase();
+    const pmMatch = time.match(/(\d+):?(\d*)\s*(PM|P)/);
+    const amMatch = time.match(/(\d+):?(\d*)\s*(AM|A)/);
+    const noPeriodMatch = time.match(/(\d+):?(\d*)/);
+
+    let h: number | undefined;
+    let m: number | undefined;
+
+    if (pmMatch) {
+      h = Number.parseInt(pmMatch[1], 10);
+      m = Number.parseInt(pmMatch[2] || "0", 10);
+      if (h === 12) h = 12; // 12 PM is 12:00
+      else h = (h % 12) + 12;
+    } else if (amMatch) {
+      h = Number.parseInt(amMatch[1], 10);
+      m = Number.parseInt(amMatch[2] || "0", 10);
+      if (h === 12) h = 0; // 12 AM is 00:00
+      else h = h % 12;
+    } else if (noPeriodMatch) {
+      h = Number.parseInt(noPeriodMatch[1], 10);
+      m = Number.parseInt(noPeriodMatch[2] || "0", 10);
+      // Assume 24h format if no AM/PM and hour is > 12
+      if (h > 12 && h <= 23) {
+        // Valid 24h time
+      } else if (h >= 1 && h <= 12) {
+        // Could be 12h or 24h, default to 12h AM for simplicity if no period
+      } else {
+        return ""; // Invalid hour
+      }
+    } else {
+      return ""; // No match
+    }
+
+    if (h === undefined || m === undefined || Number.isNaN(h) || Number.isNaN(m) || m > 59 || h > 23) {
+      return ""; // Invalid time components
+    }
+
+    return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+  }, []);
+
+  const formatTimeDisplay = useCallback((timeStr: string): string => {
+    if (!timeStr) return "";
+    
+    const [hourStr, minuteStr] = timeStr.split(':');
+    const hour = parseInt(hourStr, 10);
+    const minute = parseInt(minuteStr, 10);
+    
+    if (isNaN(hour) || isNaN(minute)) return timeStr;
+    
+    if (hour12) {
+      const period = hour >= 12 ? "PM" : "AM";
+      const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+      return `${displayHour}:${minute.toString().padStart(2, "0")} ${period}`;
+    } else {
+      return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+    }
+  }, [hour12]);
+
+  const handleTimePickerSelect = useCallback((timeStr: string) => {
+    // timeStr comes in as "HH:mm:ss" format from the picker
+    const [hour, minute] = timeStr.split(':');
+    const formattedTime = `${hour}:${minute}`;
+    setInputTime(formattedTime);
+    setShowCustomTimePicker(false);
+  }, []);
+
+  // Convert inputTime for display in the input field
+  const displayTime = useMemo(() => {
+    if (!inputTime) return "";
+    return formatTimeDisplay(inputTime);
+  }, [inputTime, formatTimeDisplay]);
+
   return (
     <div className={`bg-card/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl p-4 sm:p-6 lg:p-8 shadow-xl border border-border/50 dark:border-slate-700/50 hover:shadow-2xl transition-all duration-300 ${className}`}>
       {/* Header */}
@@ -359,13 +439,29 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
             Convert time between any two timezones. Handles DST automatically.
           </p>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setHour12(!hour12)}
-            className="px-3 sm:px-4 py-2 text-sm font-medium bg-gradient-to-r from-secondary to-secondary/80 dark:from-slate-700 dark:to-slate-600 text-secondary-foreground dark:text-slate-200 rounded-xl hover:from-secondary/80 hover:to-secondary dark:hover:from-slate-600 dark:hover:to-slate-500 transition-all duration-200 shadow-sm shrink-0"
-          >
-            {hour12 ? '12h' : '24h'} format
-          </button>
+        <div className="flex items-center justify-center">
+          <div className="bg-muted/50 dark:bg-slate-700/50 rounded-xl p-1.5 flex items-center gap-1">
+            <button
+              onClick={() => setHour12(true)}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                hour12
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+            >
+              12h
+            </button>
+            <button
+              onClick={() => setHour12(false)}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                !hour12
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+            >
+              24h
+            </button>
+          </div>
         </div>
       </div>
 
@@ -518,12 +614,32 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
             <div className="relative">
               <input
                 id="time-input"
-                type="time"
-                value={inputTime}
-                onChange={(e) => setInputTime(e.target.value)}
+                type="text"
+                value={displayTime}
+                onChange={(e) => {
+                  const input = e.target.value;
+                  if (hour12) {
+                    // For 12h format, convert to 24h before storing
+                    const converted = convertTo24Hour(input);
+                    setInputTime(converted || input);
+                  } else {
+                    // For 24h format, store directly but validate
+                    if (input === "" || /^(\d{0,2}):?(\d{0,2})$/.test(input)) {
+                      setInputTime(input);
+                    }
+                  }
+                }}
+                placeholder={hour12 ? "9:00 AM" : "09:00"}
                 className="w-full px-3 py-3 bg-input dark:bg-slate-700 border-2 border-border dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 text-sm font-mono shadow-sm dark:text-slate-100"
               />
-              <Clock className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors z-30"
+                onClick={() => setShowCustomTimePicker(true)}
+                tabIndex={-1}
+              >
+                <Clock className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>
@@ -539,8 +655,12 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
             <button
               type="button"
               onClick={handleCalculate}
-              className="px-8 py-3 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-primary-foreground rounded-xl font-semibold text-base transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+              className="w-full bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
             >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" />
+                <circle cx="12" cy="12" r="10" />
+              </svg>
               Calculate Time Difference
             </button>
           </div>
@@ -603,6 +723,18 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
           🌍 Handles Daylight Saving Time automatically
         </p>
       </div>
+
+      {/* Custom Time Picker Modal */}
+      {showCustomTimePicker && (
+        <CustomTimePicker
+          field="time"
+          is24h={!hour12}
+          currentTime={inputTime && inputTime.trim() ? `${inputTime.trim()}:00` : "09:00:00"}
+          onSelect={handleTimePickerSelect}
+          onClose={() => setShowCustomTimePicker(false)}
+          title="Select Time"
+        />
+      )}
     </div>
   );
 }

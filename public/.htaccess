@@ -1,0 +1,26 @@
+# Apache redirect rules for ClockMath.com
+# These rules enforce non-www domain and trailing slashes
+
+RewriteEngine On
+
+# Force non-www domain
+RewriteCond %{HTTP_HOST} ^www\.clockmath\.com$ [NC]
+RewriteRule ^(.*)$ https://clockmath.com/$1 [R=301,L]
+
+# Force HTTPS
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://clockmath.com/$1 [R=301,L]
+
+# Add trailing slash to directories (except files with extensions)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_URI} !/$
+RewriteCond %{REQUEST_URI} !\.[^./]+$
+RewriteRule ^(.*)$ /$1/ [R=301,L]
+
+# Legacy redirects
+RewriteRule ^timezone-converter/?$ /tools/timezone/ [R=301,L]
+RewriteRule ^time-calculator/?$ / [R=301,L]
+RewriteRule ^calculator/?$ / [R=301,L]
+RewriteRule ^article/(.*)$ /articles/$1 [R=301,L]
+RewriteRule ^tool/(.*)$ /tools/$1 [R=301,L]
+RewriteRule ^blog/(.*)$ /articles/$1 [R=301,L]

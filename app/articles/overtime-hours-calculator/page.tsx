@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 import { Metadata } from "next";
 import Link from "next/link";
 import ArticleLayout from "../../../components/ArticleLayout";
@@ -32,6 +33,8 @@ export default function OvertimeHoursCalculatorPage() {
       title="Calculate Overtime Hours the Easy Way"
       description="Overtime pay can make a big difference, but only if hours are tracked correctly. Manually calculating overtime can get confusing."
       publishDate="2025"
+      category="calculator"
+      currentPath="/articles/overtime-hours-calculator"
     >
       <h2>Introduction</h2>
       <p>

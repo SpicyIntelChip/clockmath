@@ -12,6 +12,8 @@ const nextConfig = {
   output: 'export',
   trailingSlash: true,
   distDir: 'out',
+  // Note: For static export, redirects and canonical enforcement 
+  // must be handled at the hosting level (Netlify, Cloudflare, etc.)
 }
 
 export default nextConfig

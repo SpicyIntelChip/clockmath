@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 import { Metadata } from 'next';
 import ArticleLayout from '@/components/ArticleLayout';
 
@@ -38,7 +39,8 @@ export default function TravelTimezoneConverterPage() {
       title="Plan International Travel with a Timezone Converter"
       description="Master time zones for stress-free international travel planning"
       publishDate="2025-01-15"
-      category="Travel"
+      category="timezone"
+      currentPath="/articles/travel-timezone-converter"
     >
       <section className="prose prose-lg max-w-none dark:prose-invert">
         <h2>Introduction</h2>

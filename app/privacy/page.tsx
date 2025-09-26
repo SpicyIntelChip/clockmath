@@ -1,3 +1,5 @@
+/* eslint-disable react/no-unescaped-entities */
+import Link from "next/link";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -28,7 +30,7 @@ export default function PrivacyPage() {
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Header */}
         <div className="text-center mb-8">
-          <a 
+          <Link 
             href="/" 
             className="inline-flex items-center gap-2 text-primary hover:text-primary/80 transition-colors mb-4"
           >
@@ -36,7 +38,7 @@ export default function PrivacyPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
             Back to Calculator
-          </a>
+          </Link>
           <h1 className="text-4xl font-bold text-foreground dark:text-slate-100 mb-2">
             🛡️ Privacy Policy
           </h1>
@@ -161,7 +163,7 @@ export default function PrivacyPage() {
 
         {/* Back to Calculator CTA */}
         <div className="text-center mt-8">
-          <a
+          <Link
             href="/"
             className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-lg font-semibold hover:bg-primary/90 transition-colors"
           >
@@ -169,7 +171,7 @@ export default function PrivacyPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             Use Time Calculator
-          </a>
+          </Link>
         </div>
       </div>
     </div>

@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 import { Metadata } from "next";
 import Link from "next/link";
 import ArticleLayout from "../../../components/ArticleLayout";
@@ -32,6 +33,8 @@ export default function TimeBetweenDatesCalculatorPage() {
       title="Time Between Two Dates: Fast & Accurate"
       description="Need to know how much time until your next vacation, project deadline, or special event? Calculating the time between two dates is simple with the right tool."
       publishDate="2025"
+      category="calculator"
+      currentPath="/articles/time-between-dates-calculator"
     >
       <h2>Introduction</h2>
       <p>
