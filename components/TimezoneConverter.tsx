@@ -45,6 +45,9 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
   
   // Custom time picker state
   const [showCustomTimePicker, setShowCustomTimePicker] = useState(false);
+  
+  // Track if component has hydrated to prevent SSR mismatch
+  const [isHydrated, setIsHydrated] = useState(false);
 
   const timeZoneOptions = useMemo(() => getTimeZoneOptions(), []);
 
@@ -53,8 +56,15 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
     return opt ? opt.label.split(' (')[0] : (tz?.split('/').pop()?.replace(/_/g, ' ') || tz);
   }, [timeZoneOptions]);
 
-  // Initialize with user's timezone
+  // Hydration effect - runs only on client
   useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  // Initialize with user's timezone (only after hydration)
+  useEffect(() => {
+    if (!isHydrated) return;
+    
     const userTZ = getUserTimeZone();
     setFromTZ(userTZ);
     
@@ -72,14 +82,14 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
       const locale = Intl.DateTimeFormat().resolvedOptions();
       setHour12(locale.hour12 !== undefined ? locale.hour12 : true);
     }
-  }, []);
+  }, [isHydrated]);
 
-  // Save hour12 preference
+  // Save hour12 preference (only after hydration)
   useEffect(() => {
-    if (typeof hour12 === 'boolean') {
+    if (isHydrated && typeof hour12 === 'boolean') {
       localStorage.setItem('clockmath-hour12', hour12.toString());
     }
-  }, [hour12]);
+  }, [hour12, isHydrated]);
 
   // Centralized calculation helper so we can reuse for swap
   const computeConversion = useCallback((from: string, to: string, opts?: { dateStr?: string; timeStr?: string }) => {
@@ -491,7 +501,7 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
                   setFromLocationDisplay(placeName);
                 }
               }}
-              defaultHint={`Auto-detected: ${getUserTimeZone()}`}
+              defaultHint={isHydrated ? `Auto-detected: ${getUserTimeZone()}` : "Auto-detecting timezone..."}
               value={fromLocationDisplay}
               preset={fromPreset}
               timeZone={fromTZ}
