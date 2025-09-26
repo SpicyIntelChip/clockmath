@@ -14,6 +14,7 @@ interface LocationTimezonePickerProps {
   timeZone?: string; // optional: externally control the resolved IANA timezone (e.g., when swapping)
   id?: string; // Add id prop for accessibility
   name?: string; // Add name prop for form handling
+  onDisplayChange?: (value: string) => void; // Callback for when display text changes (typing)
 }
 
 export function LocationTimezonePicker({
@@ -26,6 +27,7 @@ export function LocationTimezonePicker({
   timeZone,
   id,
   name,
+  onDisplayChange,
 }: LocationTimezonePickerProps) {
   const [iana, setIana] = useState<string>("");
   const [displayLabel, setDisplayLabel] = useState<string>(""); // shown under the input
@@ -43,12 +45,13 @@ export function LocationTimezonePicker({
   };
 
   // Update display when external value changes (like from swap/clear) - higher priority
+  // Only sync when external value is explicitly set, don't include displayLabel in deps to avoid loops
   useEffect(() => {
-    if (value !== undefined && value !== displayLabel) {
+    if (value !== undefined) {
+      console.log('LocationTimezonePicker: syncing external value to display:', value);
       setDisplayLabel(value);
-      // Don't trigger searches when value is set programmatically (like from swap/clear)
     }
-  }, [value, displayLabel]);
+  }, [value]);
 
   // Keep internal IANA in sync with external timeZone prop (e.g., after swap/clear)
   useEffect(() => {
@@ -103,6 +106,11 @@ export function LocationTimezonePicker({
         value={displayLabel}
         id={id}
         name={name}
+        onInputChange={(newValue) => {
+          console.log('LocationTimezonePicker: input changed to', newValue);
+          setDisplayLabel(newValue);
+          onDisplayChange?.(newValue); // Notify parent of display changes
+        }}
       />
 
       <div className="mt-2 min-h-[1.25rem]">
