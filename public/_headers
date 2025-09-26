@@ -1,0 +1,30 @@
+# Cloudflare Pages headers for ClockMath.com
+
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+
+# Ensure HTTPS for all pages
+/*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+
+# Cache static assets
+*.js
+  Cache-Control: public, max-age=31536000, immutable
+
+*.css
+  Cache-Control: public, max-age=31536000, immutable
+
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+  Cache-Control: public, max-age=31536000, immutable
+
+# HTML pages should be cached for shorter periods
+*.html
+  Cache-Control: public, max-age=3600
