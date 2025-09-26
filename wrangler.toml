@@ -2,6 +2,9 @@ name = "clockmath"
 compatibility_date = "2025-08-28"
 compatibility_flags = ["nodejs_compat"]
 
+# Pages deployment configuration
+pages_build_output_dir = ".vercel/output/static"
+
 [vars]
 NEXT_PUBLIC_GA_ID = "G-5L3QN6938D"
 
