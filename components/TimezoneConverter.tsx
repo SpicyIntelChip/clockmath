@@ -509,6 +509,8 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
               value={fromLocationDisplay}
               preset={fromPreset}
               timeZone={fromTZ}
+              id="from-location"
+              name="fromLocation"
             />
           </div>
 
@@ -529,6 +531,8 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
               value={toLocationDisplay}
               preset={toPreset}
               timeZone={toTZ}
+              id="to-location"
+              name="toLocation"
             />
             
             {/* Swap Button */}
