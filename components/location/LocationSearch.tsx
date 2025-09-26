@@ -71,6 +71,14 @@ export function LocationSearch({
   // abort/guard stale requests
   const abortRef = useRef<AbortController | null>(null);
   const reqIdRef = useRef(0);
+  
+  // Track hydration to prevent SSR mismatches
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Hydration effect
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   // Update internal query when external value changes
   useEffect(() => {
