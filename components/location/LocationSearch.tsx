@@ -7,6 +7,43 @@ export type Place = {
   lon: number;
 };
 
+// Fallback cities for when the API is unavailable
+const POPULAR_CITIES: Place[] = [
+  { name: "New York, NY, USA", lat: 40.7128, lon: -74.0060 },
+  { name: "London, England, UK", lat: 51.5074, lon: -0.1278 },
+  { name: "Tokyo, Japan", lat: 35.6762, lon: 139.6503 },
+  { name: "Paris, France", lat: 48.8566, lon: 2.3522 },
+  { name: "Los Angeles, CA, USA", lat: 34.0522, lon: -118.2437 },
+  { name: "Sydney, Australia", lat: -33.8688, lon: 151.2093 },
+  { name: "Berlin, Germany", lat: 52.5200, lon: 13.4050 },
+  { name: "Toronto, ON, Canada", lat: 43.6532, lon: -79.3832 },
+  { name: "Madrid, Spain", lat: 40.4168, lon: -3.7038 },
+  { name: "Rome, Italy", lat: 41.9028, lon: 12.4964 },
+  { name: "Mumbai, India", lat: 19.0760, lon: 72.8777 },
+  { name: "Singapore", lat: 1.3521, lon: 103.8198 },
+  { name: "Dubai, UAE", lat: 25.2048, lon: 55.2708 },
+  { name: "São Paulo, Brazil", lat: -23.5505, lon: -46.6333 },
+  { name: "Mexico City, Mexico", lat: 19.4326, lon: -99.1332 },
+  { name: "Moscow, Russia", lat: 55.7558, lon: 37.6176 },
+  { name: "Seoul, South Korea", lat: 37.5665, lon: 126.9780 },
+  { name: "Bangkok, Thailand", lat: 13.7563, lon: 100.5018 },
+  { name: "Cairo, Egypt", lat: 30.0444, lon: 31.2357 },
+  { name: "Jakarta, Indonesia", lat: -6.2088, lon: 106.8456 },
+  { name: "Chicago, IL, USA", lat: 41.8781, lon: -87.6298 },
+  { name: "San Francisco, CA, USA", lat: 37.7749, lon: -122.4194 },
+  { name: "Vancouver, BC, Canada", lat: 49.2827, lon: -123.1207 },
+  { name: "Amsterdam, Netherlands", lat: 52.3676, lon: 4.9041 },
+  { name: "Zurich, Switzerland", lat: 47.3769, lon: 8.5417 },
+];
+
+function getFallbackCities(query: string): Place[] {
+  if (!query || query.length < 2) return [];
+  
+  return POPULAR_CITIES.filter(city =>
+    city.name.toLowerCase().includes(query)
+  ).slice(0, 8);
+}
+
 interface LocationSearchProps {
   placeholder?: string;
   ariaLabel: string;
@@ -65,19 +102,33 @@ export function LocationSearch({
         const res = await fetch(`/api/places?q=${encodeURIComponent(q)}`, {
           signal: ac.signal,
         });
-        if (!res.ok) throw new Error("bad");
-        const data = await res.json();
+        
+        let results: Place[] = [];
+        
+        if (res.ok) {
+          const data = await res.json();
+          results = data?.results ?? [];
+        } else {
+          // Fallback to basic city suggestions if API fails
+          console.warn('Location API failed, using fallback cities');
+          results = getFallbackCities(q.toLowerCase().trim());
+        }
+        
         // ignore stale responses
         if (id !== reqIdRef.current || ac.signal.aborted) return;
 
-        const results: Place[] = data?.results ?? [];
         setItems(results);
         setOpen(focused && results.length > 0); // only open if still focused
       } catch (error) {
         if (ac.signal.aborted) return;
-        console.error('Location search failed:', error);
-        setItems([]);
-        setOpen(false);
+        console.warn('Location search failed, using fallback:', error);
+        
+        // Use fallback cities when API fails
+        const fallbackResults = getFallbackCities(q.toLowerCase().trim());
+        if (id === reqIdRef.current && !ac.signal.aborted) {
+          setItems(fallbackResults);
+          setOpen(focused && fallbackResults.length > 0);
+        }
       } finally {
         if (id === reqIdRef.current && !ac.signal.aborted) setLoading(false);
       }
