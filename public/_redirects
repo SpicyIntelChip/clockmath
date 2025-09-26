@@ -1,22 +1,15 @@
-# Netlify redirect rules for ClockMath.com
+# Cloudflare Pages redirect rules for ClockMath.com
 # These rules enforce non-www domain and trailing slashes
 
 # Force non-www domain (301 redirects)
 https://www.clockmath.com/* https://clockmath.com/:splat 301!
 
-# Ensure trailing slashes for main pages (only if not present and not already a file)
-/articles /articles/ 301
-/tools /tools/ 301
-/privacy /privacy/ 301
-/terms /terms/ 301
-/contact /contact/ 301
-
-# Handle common URL variations that might be indexed (avoiding loops)
-/article/* /articles/:splat/ 301
-/tool/* /tools/:splat/ 301
-/blog/* /articles/:splat/ 301
-
 # Legacy redirects if any old URLs exist
 /timezone-converter /tools/timezone/ 301
 /time-calculator / 301
 /calculator / 301
+
+# Handle common URL variations that might be indexed
+/article/* /articles/:splat/ 301
+/tool/* /tools/:splat/ 301
+/blog/* /articles/:splat/ 301
