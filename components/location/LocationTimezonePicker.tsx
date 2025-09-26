@@ -12,6 +12,8 @@ interface LocationTimezonePickerProps {
   value?: string; // Allow external control of the input value
   preset?: { lat: number; lon: number } | null; // optional: preset coord to programmatically set (e.g., geolocation button)
   timeZone?: string; // optional: externally control the resolved IANA timezone (e.g., when swapping)
+  id?: string; // Add id prop for accessibility
+  name?: string; // Add name prop for form handling
 }
 
 export function LocationTimezonePicker({
@@ -22,6 +24,8 @@ export function LocationTimezonePicker({
   value,
   preset,
   timeZone,
+  id,
+  name,
 }: LocationTimezonePickerProps) {
   const [iana, setIana] = useState<string>("");
   const [displayLabel, setDisplayLabel] = useState<string>(""); // shown under the input
@@ -97,6 +101,8 @@ export function LocationTimezonePicker({
         placeholder="Type a city…"
         onSelect={handleSelect}
         value={displayLabel}
+        id={id}
+        name={name}
       />
 
       <div className="mt-2 min-h-[1.25rem]">

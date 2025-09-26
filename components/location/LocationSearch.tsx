@@ -72,6 +72,8 @@ interface LocationSearchProps {
   onSelect: (place: Place) => void;
   className?: string;
   value?: string; // Allow external control
+  id?: string; // Add id prop for accessibility
+  name?: string; // Add name prop for form handling
 }
 
 export function LocationSearch({
@@ -80,6 +82,8 @@ export function LocationSearch({
   onSelect,
   className = "",
   value: externalValue,
+  id,
+  name,
 }: LocationSearchProps) {
   const [q, setQ] = useState(externalValue || "");
   const [items, setItems] = useState<Place[]>([]);
@@ -100,6 +104,7 @@ export function LocationSearch({
   // Hydration effect
   useEffect(() => {
     setIsHydrated(true);
+    console.log('LocationSearch component mounted and hydrated');
   }, []);
 
   // Update internal query when external value changes
@@ -185,11 +190,14 @@ export function LocationSearch({
 
   return (
     <div className={`relative ${className}`}>
-      <label className="sr-only">{ariaLabel}</label>
+      <label className="sr-only" htmlFor={id}>{ariaLabel}</label>
       <input
+        id={id}
+        name={name}
         aria-label={ariaLabel}
         value={q}
         onChange={(e) => {
+          console.log('Input changed:', e.target.value);
           setQ(e.target.value);
         }}
         onFocus={() => {
