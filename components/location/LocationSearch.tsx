@@ -202,8 +202,9 @@ export function LocationSearch({
           setTimeout(() => setOpen(false), 100);
         }}
         placeholder={placeholder}
-        className="w-full px-3 sm:px-4 py-3 sm:py-4 bg-input dark:bg-slate-700 border-2 border-border dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 text-base sm:text-lg font-mono shadow-sm dark:text-slate-100"
+        className="w-full px-3 sm:px-4 py-3 sm:py-4 bg-input dark:bg-slate-700 border-2 border-border dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 text-base sm:text-lg shadow-sm text-foreground dark:text-slate-100"
         autoComplete="off"
+        style={{ color: 'inherit' }}
       />
       {loading && (
         <div className="absolute right-4 top-1/2 -translate-y-1/2 text-xs opacity-70 text-muted-foreground">…</div>
