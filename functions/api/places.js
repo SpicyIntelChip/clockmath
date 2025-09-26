@@ -1,22 +1,7 @@
-// Cloudflare Function for location search using Geoapify
-// This replaces the Next.js API route for static export compatibility
+// Cloudflare Pages Function for location search using Geoapify
+// Using the official Cloudflare Pages Functions API
 
-interface Env {
-  GEOAPIFY_API_KEY: string;
-}
-
-interface EventContext<Env = any, P = any, Data = any> {
-  request: Request;
-  env: Env;
-  params: P;
-  data: Data;
-  next: (input?: Request | string, init?: RequestInit) => Promise<Response>;
-  waitUntil: (promise: Promise<any>) => void;
-}
-
-type PagesFunction<Env = any, P = any, Data = any> = (context: EventContext<Env, P, Data>) => Response | Promise<Response>;
-
-export const onRequestGet: PagesFunction<Env> = async (context) => {
+export async function onRequestGet(context) {
   const { request, env } = context;
   const url = new URL(request.url);
   const query = url.searchParams.get('q');
@@ -46,6 +31,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     );
   }
 
+  // Access the encrypted secret from Cloudflare environment
   if (!env.GEOAPIFY_API_KEY) {
     console.error('GEOAPIFY_API_KEY not found in environment');
     return new Response(
@@ -67,8 +53,6 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     geoapifyUrl.searchParams.set('apiKey', env.GEOAPIFY_API_KEY);
     geoapifyUrl.searchParams.set('limit', '8');
     geoapifyUrl.searchParams.set('format', 'json');
-    
-    // Prioritize populated places (cities, towns, etc.)
     geoapifyUrl.searchParams.set('type', 'city,locality,district,neighbourhood');
 
     const response = await fetch(geoapifyUrl.toString());
@@ -80,7 +64,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     const data = await response.json();
     
     // Transform Geoapify response to our Place format
-    const results = (data.results || []).map((item: any) => ({
+    const results = (data.results || []).map((item) => ({
       name: formatPlaceName(item),
       lat: item.lat,
       lon: item.lon,
@@ -113,32 +97,27 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
       }
     );
   }
-};
+}
 
 // Helper function to format place names nicely
-function formatPlaceName(item: any): string {
+function formatPlaceName(item) {
   const parts = [];
   
-  // Add the main place name
   if (item.name) {
     parts.push(item.name);
   } else if (item.city) {
     parts.push(item.city);
-  } else if (item.town) {
-    parts.push(item.town);
-  } else if (item.village) {
-    parts.push(item.village);
   }
-  
-  // Add state/region if different from main name
-  if (item.state && item.state !== parts[0]) {
+
+  if (item.state && item.state !== item.name) {
     parts.push(item.state);
+  } else if (item.county && item.county !== item.name) {
+    parts.push(item.county);
   }
-  
-  // Add country
-  if (item.country) {
+
+  if (item.country && item.country !== item.state && item.country !== item.name) {
     parts.push(item.country);
   }
-  
+
   return parts.filter(Boolean).join(', ');
 }
