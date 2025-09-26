@@ -57,6 +57,15 @@ const POPULAR_CITIES: Place[] = [
   { name: "Fredericton, NB, Canada", lat: 45.9636, lon: -66.6431 },
   { name: "Winnipeg, MB, Canada", lat: 49.8951, lon: -97.1384 },
   { name: "Quebec City, QC, Canada", lat: 46.8139, lon: -71.2080 },
+  { name: "Edmonton, AB, Canada", lat: 53.5461, lon: -113.4938 },
+  { name: "Victoria, BC, Canada", lat: 48.4284, lon: -123.3656 },
+  { name: "St. John's, NL, Canada", lat: 47.5615, lon: -52.7126 },
+  { name: "Saskatoon, SK, Canada", lat: 52.1579, lon: -106.6702 },
+  { name: "Regina, SK, Canada", lat: 50.4452, lon: -104.6189 },
+  { name: "Charlottetown, PE, Canada", lat: 46.2382, lon: -63.1311 },
+  { name: "Yellowknife, NT, Canada", lat: 62.4540, lon: -114.3718 },
+  { name: "Whitehorse, YT, Canada", lat: 60.7212, lon: -135.0568 },
+  { name: "Iqaluit, NU, Canada", lat: 63.7467, lon: -68.5170 },
   { name: "Dubai, UAE", lat: 25.2048, lon: 55.2708 },
   { name: "São Paulo, Brazil", lat: -23.5505, lon: -46.6333 },
   { name: "Mexico City, Mexico", lat: 19.4326, lon: -99.1332 },
@@ -72,6 +81,8 @@ function getFallbackCities(query: string): Place[] {
     city.name.toLowerCase().includes(query)
   ).slice(0, 8);
 }
+
+
 
 interface LocationSearchProps {
   placeholder?: string;
@@ -146,7 +157,7 @@ export function LocationSearch({
     const t = setTimeout(async () => {
       setLoading(true);
       try {
-        // Try API first, fallback to hardcoded cities if API fails
+        // Try Geoapify API directly, fallback to hardcoded cities if API fails
         let results: Place[] = [];
         
         try {
