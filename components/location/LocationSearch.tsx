@@ -50,6 +50,13 @@ const POPULAR_CITIES: Place[] = [
   { name: "Melbourne, Australia", lat: -37.8136, lon: 144.9631 },
   { name: "Toronto, ON, Canada", lat: 43.6532, lon: -79.3832 },
   { name: "Vancouver, BC, Canada", lat: 49.2827, lon: -123.1207 },
+  { name: "Montreal, QC, Canada", lat: 45.5017, lon: -73.5673 },
+  { name: "Calgary, AB, Canada", lat: 51.0447, lon: -114.0719 },
+  { name: "Ottawa, ON, Canada", lat: 45.4215, lon: -75.6972 },
+  { name: "Halifax, NS, Canada", lat: 44.6488, lon: -63.5752 },
+  { name: "Fredericton, NB, Canada", lat: 45.9636, lon: -66.6431 },
+  { name: "Winnipeg, MB, Canada", lat: 49.8951, lon: -97.1384 },
+  { name: "Quebec City, QC, Canada", lat: 46.8139, lon: -71.2080 },
   { name: "Dubai, UAE", lat: 25.2048, lon: 55.2708 },
   { name: "São Paulo, Brazil", lat: -23.5505, lon: -46.6333 },
   { name: "Mexico City, Mexico", lat: 19.4326, lon: -99.1332 },
@@ -74,6 +81,7 @@ interface LocationSearchProps {
   value?: string; // Allow external control
   id?: string; // Add id prop for accessibility
   name?: string; // Add name prop for form handling
+  onInputChange?: (value: string) => void; // Callback for when user types
 }
 
 export function LocationSearch({
@@ -84,6 +92,7 @@ export function LocationSearch({
   value: externalValue,
   id,
   name,
+  onInputChange,
 }: LocationSearchProps) {
   const [q, setQ] = useState(externalValue || "");
   const [items, setItems] = useState<Place[]>([]);
@@ -110,23 +119,26 @@ export function LocationSearch({
   // Update internal query when external value changes
   useEffect(() => {
     if (externalValue !== undefined && externalValue !== q) {
+      console.log('Syncing external value to internal state:', externalValue);
       setQ(externalValue);
       selectedLabelRef.current = externalValue;
       setItems([]);
       setOpen(false);
       setLoading(false); // Clear any loading state
     }
-  }, [externalValue, q]);
+  }, [externalValue]);
 
   useEffect(() => {
+    console.log('Search effect triggered - focused:', focused, 'query:', q);
     // do not search if not focused or empty query
     if (!focused || !q.trim()) {
+      console.log('Search skipped - not focused or empty query');
       setItems([]);
       setOpen(false);
       return;
     }
 
-    const id = ++reqIdRef.current;
+    const reqId = ++reqIdRef.current;
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
@@ -134,45 +146,44 @@ export function LocationSearch({
     const t = setTimeout(async () => {
       setLoading(true);
       try {
-        // Skip API call for now and use fallback directly until API is fixed
-        const fallbackResults = getFallbackCities(q.toLowerCase().trim());
-        
-        // ignore stale responses
-        if (id !== reqIdRef.current || ac.signal.aborted) return;
-
-        setItems(fallbackResults);
-        setOpen(focused && fallbackResults.length > 0);
-        
-        // Uncomment this when API is working:
-        /*
-        const res = await fetch(`/api/places?q=${encodeURIComponent(q)}`, {
-          signal: ac.signal,
-        });
-        
+        // Try API first, fallback to hardcoded cities if API fails
         let results: Place[] = [];
         
-        if (res.ok) {
-          const data = await res.json();
-          results = data?.results ?? [];
-        } else {
+        try {
+          const res = await fetch(`/api/places?q=${encodeURIComponent(q)}`, {
+            signal: ac.signal,
+          });
+          
+          if (res.ok) {
+            const data = await res.json();
+            results = data?.results ?? [];
+            console.log('Geoapify API results for', q, ':', results.length, 'cities found');
+          } else {
+            console.warn('API request failed, using fallback cities');
+            results = getFallbackCities(q.toLowerCase().trim());
+          }
+        } catch (apiError) {
+          console.warn('API request error, using fallback cities:', apiError);
           results = getFallbackCities(q.toLowerCase().trim());
         }
         
-        if (id !== reqIdRef.current || ac.signal.aborted) return;
+        // ignore stale responses
+        if (reqId !== reqIdRef.current || ac.signal.aborted) return;
+
         setItems(results);
         setOpen(focused && results.length > 0);
-        */
+        console.log('Dropdown open:', focused && results.length > 0, 'with', results.length, 'results');
       } catch (error) {
         if (ac.signal.aborted) return;
         console.warn('Location search failed, using fallback:', error);
         
         const fallbackResults = getFallbackCities(q.toLowerCase().trim());
-        if (id === reqIdRef.current && !ac.signal.aborted) {
+        if (reqId === reqIdRef.current && !ac.signal.aborted) {
           setItems(fallbackResults);
           setOpen(focused && fallbackResults.length > 0);
         }
       } finally {
-        if (id === reqIdRef.current && !ac.signal.aborted) setLoading(false);
+        if (reqId === reqIdRef.current && !ac.signal.aborted) setLoading(false);
       }
     }, 250);
 
@@ -198,9 +209,12 @@ export function LocationSearch({
         value={q}
         onChange={(e) => {
           console.log('Input changed:', e.target.value);
-          setQ(e.target.value);
+          const newValue = e.target.value;
+          setQ(newValue);
+          onInputChange?.(newValue);
         }}
         onFocus={() => {
+          console.log('LocationSearch focused, query:', q);
           setFocused(true);
           setOpen(items.length > 0);
         }}

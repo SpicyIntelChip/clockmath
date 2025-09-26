@@ -505,6 +505,10 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
                   setFromLocationDisplay(placeName);
                 }
               }}
+              onDisplayChange={(displayText) => {
+                console.log('TimezoneConverter: fromLocationDisplay updated to', displayText);
+                setFromLocationDisplay(displayText);
+              }}
               defaultHint={isHydrated ? `Auto-detected: ${getUserTimeZone()}` : "Auto-detecting timezone..."}
               value={fromLocationDisplay}
               preset={fromPreset}
@@ -526,6 +530,10 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
                 if (placeName) {
                   setToLocationDisplay(placeName);
                 }
+              }}
+              onDisplayChange={(displayText) => {
+                console.log('TimezoneConverter: toLocationDisplay updated to', displayText);
+                setToLocationDisplay(displayText);
               }}
               defaultHint="Search for a city..."
               value={toLocationDisplay}
