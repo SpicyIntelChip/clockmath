@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 import { Metadata } from 'next';
 import ArticleLayout from '@/components/ArticleLayout';
 
@@ -38,7 +39,8 @@ export default function StockMarketTimezoneConverterPage() {
       title="The Best Way to Convert Time Zones for Stock Market Hours"
       description="Master global stock market hours with timezone conversion"
       publishDate="2025-01-15"
-      category="Finance"
+      category="timezone"
+      currentPath="/articles/stock-market-timezone-converter"
     >
       <section className="prose prose-lg max-w-none dark:prose-invert">
         <h2>Introduction</h2>

@@ -33,7 +33,6 @@ export function SearchableSelect({
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const [inputValue, setInputValue] = useState('');
   
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -78,15 +77,6 @@ export function SearchableSelect({
   useEffect(() => {
     setHighlightedIndex(-1);
   }, [filteredOptions]);
-
-  // Update input value when selected option changes
-  useEffect(() => {
-    if (selectedOption) {
-      setInputValue(selectedOption.label);
-    } else {
-      setInputValue('');
-    }
-  }, [selectedOption]);
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if (!isOpen) {

@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 import { Metadata } from "next";
 import Link from "next/link";
 import ArticleLayout from "../../../components/ArticleLayout";
@@ -32,6 +33,8 @@ export default function HoursCalculatorOnlinePage() {
       title="Why an Online Hours Calculator Beats Manual Math"
       description="Subtracting hours manually is tricky. Mistakes happen easily when converting minutes or crossing over midnight."
       publishDate="2025"
+      category="calculator"
+      currentPath="/articles/hours-calculator-online"
     >
       <h2>Introduction</h2>
       <p>

@@ -1,45 +1,39 @@
+/* eslint-disable react/no-unescaped-entities */
 import { Metadata } from 'next';
 import ArticleLayout from '@/components/ArticleLayout';
+import { generateSEOMetadata, generateArticleStructuredData } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Timezone Converter for Family Calls – Free Tool | ClockMath',
-  description: 'Stay connected with loved ones abroad. Use ClockMath\'s timezone converter to find the best call times without waking anyone up.',
-  alternates: {
-    canonical: 'https://clockmath.com/articles/timezone-converter-family-calls',
-  },
-  openGraph: {
-    title: 'Timezone Converter for Family Calls – Free Tool | ClockMath',
-    description: 'Stay connected with loved ones abroad. Use ClockMath\'s timezone converter to find the best call times without waking anyone up.',
-    type: 'article',
-    url: 'https://clockmath.com/articles/timezone-converter-family-calls',
-    siteName: 'ClockMath',
-    images: [
-      {
-        url: '/og.png',
-        width: 1200,
-        height: 630,
-        alt: 'ClockMath Family Timezone Converter',
-      },
-    ],
-  },
-  twitter: {
-    card: 'summary_large_image',
-    images: ['/og.png'],
-  },
-  robots: {
-    index: true,
-    follow: true,
-  },
-};
+export const metadata: Metadata = generateSEOMetadata({
+  title: 'Timezone Converter for Family Calls | ClockMath',
+  description: 'Easily schedule family calls across time zones with ClockMath\'s free timezone converter. Perfect for staying connected worldwide.',
+  path: '/articles/timezone-converter-family-calls',
+  type: 'article',
+  publishDate: '2025-01-15',
+  keywords: 'timezone converter family calls, international family communication, calling abroad, family timezone, global family calls',
+});
 
 export default function FamilyCallsTimezoneConverterPage() {
   return (
     <ArticleLayout
-      title="Never Miss a Call Again: Time Zone Converter for Friends & Family"
+      title="Timezone Converter for Family Calls"
       description="Stay connected with loved ones worldwide using smart timezone conversion"
       publishDate="2025-01-15"
-      category="Family & Relationships"
+      category="timezone"
+      currentPath="/articles/timezone-converter-family-calls"
     >
+      {/* Structured Data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(generateArticleStructuredData({
+            title: 'Timezone Converter for Family Calls',
+            description: 'Easily schedule family calls across time zones with ClockMath\'s free timezone converter. Perfect for staying connected worldwide.',
+            path: '/articles/timezone-converter-family-calls',
+            publishDate: '2025-01-15',
+          })),
+        }}
+      />
+      
       <section className="prose prose-lg max-w-none dark:prose-invert">
         <h2>Introduction</h2>
         <p>

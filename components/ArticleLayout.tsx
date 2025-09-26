@@ -1,21 +1,28 @@
 import Link from "next/link";
-import { Metadata } from "next";
+import RelatedArticles from "./RelatedArticles";
+import ArticleAnalytics from "./ArticleAnalytics";
+import ArticleCtaLink from "./ArticleCtaLink";
 
 interface ArticleLayoutProps {
   children: React.ReactNode;
   title: string;
   description: string;
   publishDate?: string;
+  category?: 'timezone' | 'calculator' | 'productivity' | 'business';
+  currentPath?: string;
 }
 
 export default function ArticleLayout({ 
   children, 
   title, 
   description, 
-  publishDate = "2025" 
+  publishDate = "2025",
+  category = "calculator",
+  currentPath = ""
 }: ArticleLayoutProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800/20">
+      <ArticleAnalytics title={title} category={category} currentPath={currentPath} />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(5,150,105,0.1),transparent_50%)] dark:bg-[radial-gradient(circle_at_50%_120%,rgba(5,150,105,0.2),transparent_50%)]"></div>
       
       <main className="relative max-w-4xl mx-auto px-4 py-8">
@@ -86,41 +93,18 @@ export default function ArticleLayout({
               <p className="text-emerald-700 dark:text-emerald-300 mb-4">
                 Calculate time duration instantly with our easy-to-use tool
               </p>
-              <Link
-                href="/"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-medium rounded-xl hover:from-emerald-500 hover:to-emerald-400 transition-all duration-200 shadow-lg hover:shadow-xl"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                Start Calculating
-              </Link>
+              <ArticleCtaLink href="/" title={title} />
             </div>
           </div>
         </article>
 
-        {/* Related Articles */}
-        <div className="mt-8 bg-card/60 dark:bg-slate-800/60 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-border/50 dark:border-slate-700/50">
-          <h3 className="text-lg font-bold text-foreground dark:text-slate-100 mb-4">
-            📚 More Resources
-          </h3>
-          <div className="grid gap-2 text-sm">
-            <Link href="/articles/sleep-hours-calculator" className="text-primary hover:text-primary/80 transition-colors">
-              → Sleep Hours Calculator
-            </Link>
-            <Link href="/articles/overtime-hours-calculator" className="text-primary hover:text-primary/80 transition-colors">
-              → Overtime Hours Calculator
-            </Link>
-            <Link href="/articles/time-between-dates-calculator" className="text-primary hover:text-primary/80 transition-colors">
-              → Time Between Two Dates
-            </Link>
-            <Link href="/articles/study-time-calculator" className="text-primary hover:text-primary/80 transition-colors">
-              → Study Time Calculator
-            </Link>
-            <Link href="/articles/hours-calculator-online" className="text-primary hover:text-primary/80 transition-colors">
-              → Hours Calculator Online
-            </Link>
-          </div>
+        {/* Smart Related Articles Component */}
+        <div className="mt-8">
+          <RelatedArticles
+            currentPath={currentPath}
+            category={category}
+            maxArticles={3}
+          />
         </div>
       </main>
     </div>

@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 import { Metadata } from "next";
 import Link from "next/link";
 import ArticleLayout from "../../../components/ArticleLayout";
@@ -32,6 +33,8 @@ export default function WorkHoursCalculatorPage() {
       title="How to Calculate Work Hours Quickly"
       description="Keeping track of work hours is essential whether you're an employee logging time, a freelancer tracking billable hours, or an employer calculating payroll."
       publishDate="2025"
+      category="calculator"
+      currentPath="/articles/work-hours-calculator"
     >
       <h2>Introduction</h2>
       <p>

@@ -29,7 +29,6 @@ export function LocationSearch({
 
   // control when searches should happen
   const [focused, setFocused] = useState(false);
-  const [dirty, setDirty] = useState(false);          // user typed since last selection?
   const selectedLabelRef = useRef<string>("");        // last selected text
 
   // abort/guard stale requests
@@ -41,16 +40,15 @@ export function LocationSearch({
     if (externalValue !== undefined && externalValue !== q) {
       setQ(externalValue);
       selectedLabelRef.current = externalValue;
-      setDirty(false); // Don't search when value is set externally (swap, geolocation, etc.)
       setItems([]);
       setOpen(false);
       setLoading(false); // Clear any loading state
     }
-  }, [externalValue]);
+  }, [externalValue, q]);
 
   useEffect(() => {
-    // do not search if not focused, not dirty, or empty query
-    if (!focused || !dirty || !q.trim()) {
+    // do not search if not focused or empty query
+    if (!focused || !q.trim()) {
       setItems([]);
       setOpen(false);
       return;
@@ -75,8 +73,9 @@ export function LocationSearch({
         const results: Place[] = data?.results ?? [];
         setItems(results);
         setOpen(focused && results.length > 0); // only open if still focused
-      } catch (_) {
+      } catch (error) {
         if (ac.signal.aborted) return;
+        console.error('Location search failed:', error);
         setItems([]);
         setOpen(false);
       } finally {
@@ -85,13 +84,12 @@ export function LocationSearch({
     }, 250);
 
     return () => clearTimeout(t);
-  }, [q, focused, dirty]);
+  }, [q, focused]);
 
   // picking a place locks the value and prevents an immediate re-search
   const pick = (p: Place) => {
     selectedLabelRef.current = p.name;
     setQ(p.name);
-    setDirty(false);           // ← stop the effect from searching again
     setItems([]);
     setOpen(false);
     onSelect(p);
@@ -105,12 +103,10 @@ export function LocationSearch({
         value={q}
         onChange={(e) => {
           setQ(e.target.value);
-          setDirty(true);             // user is typing → enable search
         }}
         onFocus={() => {
           setFocused(true);
-          // only re-open if there are items and user hasn't just selected
-          setOpen(dirty && items.length > 0);
+          setOpen(items.length > 0);
         }}
         onBlur={() => {
           setFocused(false);
@@ -129,9 +125,10 @@ export function LocationSearch({
           role="listbox"
           className="absolute z-10 mt-1 w-full rounded-xl border border-border/50 bg-card dark:bg-slate-800 shadow-lg max-h-60 overflow-y-auto"
         >
-          {items.map((p, i) => (
+          {items.map((p) => (
             <li
               role="option"
+              aria-selected={selectedLabelRef.current === p.name}
               onMouseDown={(e) => {
                 e.preventDefault();
                 pick(p);

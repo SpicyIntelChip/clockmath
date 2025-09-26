@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 import { Metadata } from "next";
 import Link from "next/link";
 import ArticleLayout from "../../../components/ArticleLayout";
@@ -32,6 +33,8 @@ export default function SleepHoursCalculatorPage() {
       title="How Many Hours of Sleep Did I Get?"
       description="Ever wake up and wonder how long you actually slept? Estimating isn't enough — knowing your sleep duration helps track rest and improve health."
       publishDate="2025"
+      category="calculator"
+      currentPath="/articles/sleep-hours-calculator"
     >
       <h2>Introduction</h2>
       <p>
