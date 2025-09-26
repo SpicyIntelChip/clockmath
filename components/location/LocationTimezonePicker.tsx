@@ -96,7 +96,7 @@ export function LocationTimezonePicker({
         ariaLabel={`${label || 'Location'} search`}
         placeholder="Type a city…"
         onSelect={handleSelect}
-        value={value || displayLabel}
+        value={displayLabel}
       />
 
       <div className="mt-2 min-h-[1.25rem]">

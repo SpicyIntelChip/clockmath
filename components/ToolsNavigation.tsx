@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Clock, Globe, Calculator, History } from 'lucide-react'
+import { Clock, Globe, BookOpen, History } from 'lucide-react'
 
 interface ToolTab {
   id: string
@@ -26,6 +26,13 @@ const tools: ToolTab[] = [
     href: '/tools/timezone',
     icon: <Globe className="w-4 h-4" />,
     description: 'Convert between timezones'
+  },
+  {
+    id: 'articles',
+    label: 'Guides',
+    href: '/articles',
+    icon: <BookOpen className="w-4 h-4" />,
+    description: 'Learn best practices and scenarios'
   }
 ]
 
@@ -47,8 +54,12 @@ export default function ToolsNavigation({
   const pathname = usePathname()
   
   // Determine active tool based on pathname if currentTool not provided
-  const activeToolId = currentTool || (pathname === '/' ? 'calculator' : 
-                      pathname === '/tools/timezone' ? 'timezone' : 'calculator')
+  const activeToolId = currentTool || (
+    pathname === '/' ? 'calculator' :
+    pathname.startsWith('/tools/timezone') ? 'timezone' :
+    pathname.startsWith('/articles') ? 'articles' :
+    'calculator'
+  )
 
   return (
     <div className={`bg-card/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl p-1 shadow-xl border border-border/50 dark:border-slate-700/50 ${className}`}>

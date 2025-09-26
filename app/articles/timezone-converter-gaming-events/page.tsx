@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 import { Metadata } from 'next';
 import ArticleLayout from '@/components/ArticleLayout';
 
@@ -38,7 +39,8 @@ export default function GamingTimezoneConverterPage() {
       title="Convert Time Zones for Gaming and Online Events"
       description="Never miss game launches, esports tournaments, or online gaming events"
       publishDate="2025-01-15"
-      category="Gaming"
+      category="timezone"
+      currentPath="/articles/timezone-converter-gaming-events"
     >
       <section className="prose prose-lg max-w-none dark:prose-invert">
         <h2>Introduction</h2>

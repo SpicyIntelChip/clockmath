@@ -6,8 +6,14 @@ type GtagEvent = {
   category?: string;
   label?: string;
   value?: number;
-  params?: Record<string, any>;
+  params?: Record<string, unknown>;
 };
+
+declare global {
+  interface Window {
+    gtag?: (...args: unknown[]) => void;
+  }
+}
 
 // Check if analytics should be blocked
 const isAnalyticsBlocked = () => {
@@ -24,7 +30,7 @@ export const pageview = (url: string) => {
     console.log('🛡️ Pageview blocked:', url);
     return;
   }
-  (window as any).gtag?.("config", GA_MEASUREMENT_ID, {
+  window.gtag?.("config", GA_MEASUREMENT_ID, {
     page_path: url,
   });
 };
@@ -34,5 +40,5 @@ export const event = ({ action, params = {} }: GtagEvent) => {
     console.log('🛡️ Event blocked:', action, params);
     return;
   }
-  (window as any).gtag?.("event", action, params);
+  window.gtag?.("event", action, params);
 };

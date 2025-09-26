@@ -1,44 +1,26 @@
+/* eslint-disable react/no-unescaped-entities */
+import Link from 'next/link';
 import { Metadata } from 'next';
 import ArticleLayout from '@/components/ArticleLayout';
+import { generateSEOMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Timezone Converter for Remote Work Meetings – ClockMath',
+export const metadata: Metadata = generateSEOMetadata({
+  title: 'Timezone Converter for Remote Work Meetings | ClockMath',
   description: 'Schedule global meetings without confusion. Use ClockMath\'s free timezone converter to instantly check local times across regions.',
-  alternates: {
-    canonical: 'https://clockmath.com/articles/timezone-converter-remote-work-meetings',
-  },
-  openGraph: {
-    title: 'Timezone Converter for Remote Work Meetings – ClockMath',
-    description: 'Schedule global meetings without confusion. Use ClockMath\'s free timezone converter to instantly check local times across regions.',
-    type: 'article',
-    url: 'https://clockmath.com/articles/timezone-converter-remote-work-meetings',
-    siteName: 'ClockMath',
-    images: [
-      {
-        url: '/og.png',
-        width: 1200,
-        height: 630,
-        alt: 'ClockMath Timezone Converter for Remote Work',
-      },
-    ],
-  },
-  twitter: {
-    card: 'summary_large_image',
-    images: ['/og.png'],
-  },
-  robots: {
-    index: true,
-    follow: true,
-  },
-};
+  path: '/articles/timezone-converter-remote-work-meetings',
+  type: 'article',
+  publishDate: '2025-01-15',
+  keywords: 'timezone converter remote work, global meetings, distributed teams, international collaboration, remote team coordination',
+});
 
 export default function TimezoneConverterRemoteWorkPage() {
   return (
     <ArticleLayout
-      title="Easily Convert Time Zones for Remote Work Meetings"
+      title="Timezone Converter for Remote Work Meetings"
       description="Schedule global meetings without confusion using ClockMath's timezone converter"
       publishDate="2025-01-15"
-      category="Remote Work"
+      category="timezone"
+      currentPath="/articles/timezone-converter-remote-work-meetings"
     >
       <section className="prose prose-lg max-w-none dark:prose-invert">
         <h2>Introduction</h2>
@@ -89,7 +71,7 @@ export default function TimezoneConverterRemoteWorkPage() {
           <li>Use calendar tools that show multiple timezones</li>
           <li>Set up world clocks on your device for key locations</li>
           <li>Include timezone information in your email signature</li>
-          <li>Use <a href="/" className="text-primary hover:text-primary/80 font-semibold">time calculators</a> to determine meeting durations across zones</li>
+          <li>Use <Link href="/" className="text-primary hover:text-primary/80 font-semibold">time calculators</Link> to determine meeting durations across zones</li>
         </ul>
 
         <h2>Conclusion</h2>

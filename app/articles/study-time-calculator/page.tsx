@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 import { Metadata } from "next";
 import Link from "next/link";
 import ArticleLayout from "../../../components/ArticleLayout";
@@ -32,6 +33,8 @@ export default function StudyTimeCalculatorPage() {
       title="Track Study Sessions with a Duration Calculator"
       description="Students often struggle to know how much time they actually study. Estimations are rarely accurate."
       publishDate="2025"
+      category="calculator"
+      currentPath="/articles/study-time-calculator"
     >
       <h2>Introduction</h2>
       <p>

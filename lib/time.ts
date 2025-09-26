@@ -243,7 +243,6 @@ export function getTimeZoneDisplayName(timeZone: string): string {
   try {
     // Convert IANA timezone to friendly name
     const city = timeZone.split('/').pop()?.replace(/_/g, ' ') || timeZone;
-    const region = timeZone.split('/')[0];
     
     // Special cases for common timezones
     const specialCases: Record<string, string> = {
