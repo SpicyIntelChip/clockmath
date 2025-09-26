@@ -49,7 +49,11 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
   // Track if component has hydrated to prevent SSR mismatch
   const [isHydrated, setIsHydrated] = useState(false);
 
-  const timeZoneOptions = useMemo(() => getTimeZoneOptions(), []);
+  const timeZoneOptions = useMemo(() => {
+    // Only compute timezone options after hydration to prevent SSR mismatch
+    if (!isHydrated) return [];
+    return getTimeZoneOptions();
+  }, [isHydrated]);
 
   const displayForTZ = useCallback((tz: string) => {
     const opt = timeZoneOptions.find(o => o.id === tz);
@@ -433,9 +437,9 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
 
   // Convert inputTime for display in the input field
   const displayTime = useMemo(() => {
-    if (!inputTime) return "";
+    if (!isHydrated || !inputTime) return "";
     return formatTimeDisplay(inputTime);
-  }, [inputTime, formatTimeDisplay]);
+  }, [inputTime, formatTimeDisplay, isHydrated]);
 
   return (
     <div className={`bg-card/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl p-4 sm:p-6 lg:p-8 shadow-xl border border-border/50 dark:border-slate-700/50 hover:shadow-2xl transition-all duration-300 ${className}`}>
