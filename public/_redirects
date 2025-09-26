@@ -4,22 +4,19 @@
 # Force non-www domain (301 redirects)
 https://www.clockmath.com/* https://clockmath.com/:splat 301!
 
-# Ensure trailing slashes for main pages (if not present)
-/articles https://clockmath.com/articles/ 301
-/tools https://clockmath.com/tools/ 301
-/privacy https://clockmath.com/privacy/ 301
-/terms https://clockmath.com/terms/ 301
+# Ensure trailing slashes for main pages (only if not present and not already a file)
+/articles /articles/ 301
+/tools /tools/ 301
+/privacy /privacy/ 301
+/terms /terms/ 301
+/contact /contact/ 301
 
-# Redirect any article URLs without trailing slash
-/articles/* https://clockmath.com/articles/:splat/ 301
-/tools/* https://clockmath.com/tools/:splat/ 301
-
-# Handle common URL variations that might be indexed
-/article/* https://clockmath.com/articles/:splat/ 301
-/tool/* https://clockmath.com/tools/:splat/ 301
-/blog/* https://clockmath.com/articles/:splat/ 301
+# Handle common URL variations that might be indexed (avoiding loops)
+/article/* /articles/:splat/ 301
+/tool/* /tools/:splat/ 301
+/blog/* /articles/:splat/ 301
 
 # Legacy redirects if any old URLs exist
-/timezone-converter https://clockmath.com/tools/timezone/ 301
-/time-calculator https://clockmath.com/ 301
-/calculator https://clockmath.com/ 301
+/timezone-converter /tools/timezone/ 301
+/time-calculator / 301
+/calculator / 301
