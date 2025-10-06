@@ -82,6 +82,29 @@ function getFallbackCities(query: string): Place[] {
   ).slice(0, 8);
 }
 
+// Helper function to format place names from Geoapify API
+function formatPlaceName(item: any): string {
+  const parts = [];
+  
+  if (item.name) {
+    parts.push(item.name);
+  } else if (item.city) {
+    parts.push(item.city);
+  }
+
+  if (item.state && item.state !== item.name) {
+    parts.push(item.state);
+  } else if (item.county && item.county !== item.name) {
+    parts.push(item.county);
+  }
+
+  if (item.country && item.country !== item.state && item.country !== item.name) {
+    parts.push(item.country);
+  }
+
+  return parts.filter(Boolean).join(', ');
+}
+
 
 
 interface LocationSearchProps {
@@ -124,13 +147,11 @@ export function LocationSearch({
   // Hydration effect
   useEffect(() => {
     setIsHydrated(true);
-    console.log('LocationSearch component mounted and hydrated');
   }, []);
 
   // Update internal query when external value changes
   useEffect(() => {
     if (externalValue !== undefined && externalValue !== q) {
-      console.log('Syncing external value to internal state:', externalValue);
       setQ(externalValue);
       selectedLabelRef.current = externalValue;
       setItems([]);
@@ -140,10 +161,8 @@ export function LocationSearch({
   }, [externalValue]);
 
   useEffect(() => {
-    console.log('Search effect triggered - focused:', focused, 'query:', q);
     // do not search if not focused or empty query
     if (!focused || !q.trim()) {
-      console.log('Search skipped - not focused or empty query');
       setItems([]);
       setOpen(false);
       return;
@@ -154,49 +173,63 @@ export function LocationSearch({
     const ac = new AbortController();
     abortRef.current = ac;
 
-    const t = setTimeout(async () => {
-      setLoading(true);
-      try {
-        // Try Geoapify API directly, fallback to hardcoded cities if API fails
-        let results: Place[] = [];
+      const t = setTimeout(async () => {
+        setLoading(true);
         
         try {
-          const res = await fetch(`/api/places?q=${encodeURIComponent(q)}`, {
-            signal: ac.signal,
-          });
+          // Try Geoapify API directly, fallback to hardcoded cities if API fails
+          let results: Place[] = [];
           
-          if (res.ok) {
-            const data = await res.json();
-            results = data?.results ?? [];
-            console.log('Geoapify API results for', q, ':', results.length, 'cities found');
-          } else {
-            console.warn('API request failed, using fallback cities');
+          try {
+            const apiKey = process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY;
+            
+            if (apiKey) {
+              // Use Geoapify API directly (client-side)
+              const geoapifyUrl = new URL('https://api.geoapify.com/v1/geocode/search');
+              geoapifyUrl.searchParams.set('text', q.trim());
+              geoapifyUrl.searchParams.set('apiKey', apiKey);
+              geoapifyUrl.searchParams.set('limit', '8');
+              geoapifyUrl.searchParams.set('type', 'city');
+
+              const res = await fetch(geoapifyUrl.toString(), {
+                signal: ac.signal,
+              });
+              
+              if (res.ok) {
+                const data = await res.json();
+                // Handle GeoJSON FeatureCollection format
+                results = (data.features || []).map((feature: any) => ({
+                  name: formatPlaceName(feature.properties),
+                  lat: feature.geometry.coordinates[1], // lat is second coordinate
+                  lon: feature.geometry.coordinates[0], // lon is first coordinate
+                }));
+              } else {
+                results = getFallbackCities(q.toLowerCase().trim());
+              }
+            } else {
+              results = getFallbackCities(q.toLowerCase().trim());
+            }
+          } catch (apiError) {
             results = getFallbackCities(q.toLowerCase().trim());
           }
-        } catch (apiError) {
-          console.warn('API request error, using fallback cities:', apiError);
-          results = getFallbackCities(q.toLowerCase().trim());
-        }
-        
-        // ignore stale responses
-        if (reqId !== reqIdRef.current || ac.signal.aborted) return;
+          
+          // ignore stale responses
+          if (reqId !== reqIdRef.current || ac.signal.aborted) return;
 
-        setItems(results);
-        setOpen(focused && results.length > 0);
-        console.log('Dropdown open:', focused && results.length > 0, 'with', results.length, 'results');
-      } catch (error) {
-        if (ac.signal.aborted) return;
-        console.warn('Location search failed, using fallback:', error);
-        
-        const fallbackResults = getFallbackCities(q.toLowerCase().trim());
-        if (reqId === reqIdRef.current && !ac.signal.aborted) {
-          setItems(fallbackResults);
-          setOpen(focused && fallbackResults.length > 0);
+          setItems(results);
+          setOpen(focused && results.length > 0);
+        } catch (error) {
+          if (ac.signal.aborted) return;
+          
+          const fallbackResults = getFallbackCities(q.toLowerCase().trim());
+          if (reqId === reqIdRef.current && !ac.signal.aborted) {
+            setItems(fallbackResults);
+            setOpen(focused && fallbackResults.length > 0);
+          }
+        } finally {
+          if (reqId === reqIdRef.current && !ac.signal.aborted) setLoading(false);
         }
-      } finally {
-        if (reqId === reqIdRef.current && !ac.signal.aborted) setLoading(false);
-      }
-    }, 250);
+      }, 250);
 
     return () => clearTimeout(t);
   }, [q, focused]);
@@ -219,13 +252,11 @@ export function LocationSearch({
         aria-label={ariaLabel}
         value={q}
         onChange={(e) => {
-          console.log('Input changed:', e.target.value);
           const newValue = e.target.value;
           setQ(newValue);
           onInputChange?.(newValue);
         }}
         onFocus={() => {
-          console.log('LocationSearch focused, query:', q);
           setFocused(true);
           setOpen(items.length > 0);
         }}

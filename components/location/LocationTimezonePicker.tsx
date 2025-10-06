@@ -48,7 +48,6 @@ export function LocationTimezonePicker({
   // Only sync when external value is explicitly set, don't include displayLabel in deps to avoid loops
   useEffect(() => {
     if (value !== undefined) {
-      console.log('LocationTimezonePicker: syncing external value to display:', value);
       setDisplayLabel(value);
     }
   }, [value]);
@@ -107,7 +106,6 @@ export function LocationTimezonePicker({
         id={id}
         name={name}
         onInputChange={(newValue) => {
-          console.log('LocationTimezonePicker: input changed to', newValue);
           setDisplayLabel(newValue);
           onDisplayChange?.(newValue); // Notify parent of display changes
         }}

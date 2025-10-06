@@ -1,17 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-
-// Add custom styles for scrollbar hiding
-const customStyles = `
-  .scrollbar-hide {
-    -ms-overflow-style: none;  /* Internet Explorer 10+ */
-    scrollbar-width: none;  /* Firefox */
-  }
-  .scrollbar-hide::-webkit-scrollbar { 
-    display: none;  /* Safari and Chrome */
-  }
-`;
+import { useState, useEffect, useCallback } from "react";
 
 interface CustomTimePickerProps {
   field: 'start' | 'end' | 'time';
@@ -19,6 +8,7 @@ interface CustomTimePickerProps {
   currentTime: string;
   onSelect: (timeStr: string) => void;
   onClose: () => void;
+  onFormatChange?: (is24h: boolean) => void;
   title?: string;
 }
 
@@ -28,529 +18,584 @@ export function CustomTimePicker({
   currentTime, 
   onSelect, 
   onClose,
+  onFormatChange,
   title = "Select Time"
 }: CustomTimePickerProps) {
   const [selectedHour, setSelectedHour] = useState(9);
   const [selectedMinute, setSelectedMinute] = useState(0);
   const [selectedPeriod, setSelectedPeriod] = useState<'AM' | 'PM'>('AM');
-  
-  // Refs for wheel event handling with passive: false
-  const hourWheelRef = useRef<HTMLDivElement>(null);
-  const minuteWheelRef = useRef<HTMLDivElement>(null);
-  
-  // Throttling refs to prevent rapid scrolling
-  const lastWheelTime = useRef<number>(0);
-  const wheelThrottle = 300; // ms - increased for less sensitivity
-  
-  // Wheel accumulation for more natural scrolling
-  const wheelDelta = useRef<{ hour: number; minute: number }>({ hour: 0, minute: 0 });
-  const wheelThreshold = 50; // Accumulated delta needed to trigger scroll
-  const wheelResetTimer = useRef<NodeJS.Timeout | null>(null);
-  
-  // Touch handling for mobile
-  const touchStart = useRef<{ y: number; element: 'hour' | 'minute' | null }>({ y: 0, element: null });
-  const lastTouchTime = useRef<number>(0);
-  const touchThrottle = 200; // ms - increased for less sensitivity
+  const [timeInput, setTimeInput] = useState('');
+  const [isInputMode, setIsInputMode] = useState(false);
 
   // Parse current time on mount
   useEffect(() => {
-    if (currentTime && currentTime !== "00:00:00") {
-      const parts = currentTime.split(':');
-      let hour = parseInt(parts[0], 10);
-      let minute = parseInt(parts[1], 10);
+    if (currentTime) {
+      const [timePart] = currentTime.split(':');
+      const hour = parseInt(timePart, 10);
+      const minute = parseInt(currentTime.split(':')[1] || '0', 10);
       
-      // Validate parsed values
-      if (isNaN(hour)) hour = 9;
-      if (isNaN(minute)) minute = 0;
-      
-      if (is24h) {
-        setSelectedHour(hour);
+      if (!isNaN(hour) && !isNaN(minute)) {
+        if (is24h) {
+          setSelectedHour(hour);
+          setTimeInput(`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);
+        } else {
+          // Convert 24h to 12h
+          let hour12 = hour;
+          let period = 'AM';
+          
+          if (hour === 0) {
+            hour12 = 12;
+            period = 'AM';
+          } else if (hour < 12) {
+            hour12 = hour;
+            period = 'AM';
+          } else if (hour === 12) {
+            hour12 = 12;
+            period = 'PM';
+          } else {
+            hour12 = hour - 12;
+            period = 'PM';
+          }
+          
+          setSelectedHour(hour12);
+          setSelectedPeriod(period as 'AM' | 'PM');
+          setTimeInput(`${hour12}:${minute.toString().padStart(2, '0')} ${period}`);
+        }
         setSelectedMinute(minute);
-      } else {
-        const period = hour >= 12 ? 'PM' : 'AM';
-        const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-        setSelectedHour(displayHour);
-        setSelectedMinute(minute);
-        setSelectedPeriod(period);
       }
     } else {
-      // Set default values when no valid time is provided
-      if (is24h) {
-        setSelectedHour(9);
-        setSelectedMinute(0);
-      } else {
-        setSelectedHour(9);
-        setSelectedMinute(0);
-        setSelectedPeriod('AM');
-      }
+      // No current time, initialize with default
+      setTimeInput('');
     }
+    setIsInputMode(true);
   }, [currentTime, is24h]);
 
-  // Inject custom styles for time picker
+  // Auto-focus the input when modal opens
   useEffect(() => {
-    const styleId = 'custom-time-picker-styles';
-    if (!document.getElementById(styleId)) {
-      const style = document.createElement('style');
-      style.id = styleId;
-      style.textContent = customStyles;
-      document.head.appendChild(style);
-    }
+    const timer = setTimeout(() => {
+      const input = document.querySelector('input[type="text"]') as HTMLInputElement;
+      if (input) {
+        input.focus();
+        input.select(); // Select all text for easy replacement
+      }
+    }, 100); // Small delay to ensure modal is fully rendered
+
+    return () => clearTimeout(timer);
   }, []);
 
-  // Create base arrays for true infinite scrolling
-  const hours = is24h 
-    ? Array.from({ length: 24 }, (_, i) => i)
-    : Array.from({ length: 12 }, (_, i) => i + 1);
-  
-  const minutes = Array.from({ length: 60 }, (_, i) => i); // 1-minute intervals
-  const periods = ['AM', 'PM'];
-
-  // Scroll handlers for infinite looping
-  const handleHourScroll = useCallback((direction: 'up' | 'down') => {
-    const maxHour = is24h ? 23 : 12;
-    const minHour = is24h ? 0 : 1;
+  // Auto-format time input (e.g., "1230" -> "12:30")
+  const handleTimeInputChange = useCallback((value: string) => {
+    // Allow colons and digits
+    const cleanValue = value.replace(/[^\d:]/g, '');
     
-    let newHour;
-    // Note: 'up' means previous/smaller number, 'down' means next/larger number
-    if (direction === 'down') { // Arrow pointing down = increase number
-      newHour = selectedHour === maxHour ? minHour : selectedHour + 1;
-    } else { // Arrow pointing up = decrease number
-      newHour = selectedHour === minHour ? maxHour : selectedHour - 1;
-    }
-    
-    setSelectedHour(newHour);
-    
-    // Immediate smooth scroll without setTimeout
-    requestAnimationFrame(() => {
-      const hourElement = hourWheelRef.current;
-      if (hourElement) {
-        const buttonHeight = 44; // px-3 py-2 ≈ 44px height
-        const containerHeight = hourElement.clientHeight; // 128px
-        const topPadding = 40; // h-10 = 40px
-        const centerOffset = (containerHeight - buttonHeight) / 2;
-        const targetIndex = hours.indexOf(newHour);
-        const maxScrollTop = hourElement.scrollHeight - containerHeight;
-        const scrollTop = topPadding + (targetIndex * buttonHeight) - centerOffset;
+    // Handle different input patterns
+    if (cleanValue.includes(':')) {
+      // User typed a colon, respect their input
+      const parts = cleanValue.split(':');
+      if (parts.length === 2) {
+        const hour = parseInt(parts[0], 10);
+        const minute = parseInt(parts[1], 10);
         
-        hourElement.scrollTo({
-          top: Math.max(0, Math.min(maxScrollTop, scrollTop)),
-          behavior: 'smooth'
-        });
-      }
-    });
-  }, [selectedHour, is24h, hours]);
-
-  const handleMinuteScroll = useCallback((direction: 'up' | 'down') => {
-    const currentIndex = minutes.indexOf(selectedMinute);
-    let newMinute;
-    // Note: 'up' means previous/smaller number, 'down' means next/larger number
-    if (direction === 'down') { // Arrow pointing down = increase number
-      const nextIndex = currentIndex === minutes.length - 1 ? 0 : currentIndex + 1;
-      newMinute = minutes[nextIndex];
-    } else { // Arrow pointing up = decrease number
-      const prevIndex = currentIndex === 0 ? minutes.length - 1 : currentIndex - 1;
-      newMinute = minutes[prevIndex];
-    }
-    
-    setSelectedMinute(newMinute);
-    
-    // Immediate smooth scroll without setTimeout
-    requestAnimationFrame(() => {
-      const minuteElement = minuteWheelRef.current;
-      if (minuteElement) {
-        const buttonHeight = 44; // px-3 py-2 ≈ 44px height
-        const containerHeight = minuteElement.clientHeight; // 128px
-        const topPadding = 40; // h-10 = 40px
-        const centerOffset = (containerHeight - buttonHeight) / 2;
-        const targetIndex = minutes.indexOf(newMinute);
-        const maxScrollTop = minuteElement.scrollHeight - containerHeight;
-        const scrollTop = topPadding + (targetIndex * buttonHeight) - centerOffset;
-        
-        minuteElement.scrollTo({
-          top: Math.max(0, Math.min(maxScrollTop, scrollTop)),
-          behavior: 'smooth'
-        });
-      }
-    });
-  }, [selectedMinute, minutes]);
-
-  // Add wheel and touch event listeners
-  useEffect(() => {
-    const hourElement = hourWheelRef.current;
-    const minuteElement = minuteWheelRef.current;
-
-    const handleHourWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      
-      // Accumulate wheel delta for more natural scrolling
-      wheelDelta.current.hour += e.deltaY;
-      
-      // Clear any existing reset timer
-      if (wheelResetTimer.current) {
-        clearTimeout(wheelResetTimer.current);
-      }
-      
-      // Set timer to reset accumulation after user stops scrolling
-      wheelResetTimer.current = setTimeout(() => {
-        wheelDelta.current.hour = 0;
-        wheelDelta.current.minute = 0;
-      }, 200);
-      
-      // Check if we've accumulated enough delta to trigger a scroll
-      if (Math.abs(wheelDelta.current.hour) >= wheelThreshold) {
-        const now = Date.now();
-        if (now - lastWheelTime.current > 50) { // Reduced throttle for accumulated scrolling
-          // Wheel down (positive deltaY) = scroll down = increase number = 'down'
-          // Wheel up (negative deltaY) = scroll up = decrease number = 'up'
-          handleHourScroll(wheelDelta.current.hour > 0 ? 'down' : 'up');
-          wheelDelta.current.hour = 0; // Reset accumulation
-          lastWheelTime.current = now;
+        if (!isNaN(hour) && !isNaN(minute)) {
+          if (is24h) {
+            if (hour >= 0 && hour <= 23) {
+              setSelectedHour(hour);
+            }
+          } else {
+            if (hour >= 1 && hour <= 12) {
+              setSelectedHour(hour);
+            } else if (hour > 12 && hour <= 23) {
+              setSelectedHour(hour - 12);
+              setSelectedPeriod('PM');
+            }
+          }
+          
+          if (minute >= 0 && minute <= 59) {
+            setSelectedMinute(minute);
+          }
         }
       }
-    };
-
-    const handleMinuteWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      
-      // Accumulate wheel delta for more natural scrolling
-      wheelDelta.current.minute += e.deltaY;
-      
-      // Clear any existing reset timer
-      if (wheelResetTimer.current) {
-        clearTimeout(wheelResetTimer.current);
-      }
-      
-      // Set timer to reset accumulation after user stops scrolling
-      wheelResetTimer.current = setTimeout(() => {
-        wheelDelta.current.hour = 0;
-        wheelDelta.current.minute = 0;
-      }, 200);
-      
-      // Check if we've accumulated enough delta to trigger a scroll
-      if (Math.abs(wheelDelta.current.minute) >= wheelThreshold) {
-        const now = Date.now();
-        if (now - lastWheelTime.current > 50) { // Reduced throttle for accumulated scrolling
-          // Wheel down (positive deltaY) = scroll down = increase number = 'down'
-          // Wheel up (negative deltaY) = scroll up = decrease number = 'up'
-          handleMinuteScroll(wheelDelta.current.minute > 0 ? 'down' : 'up');
-          wheelDelta.current.minute = 0; // Reset accumulation
-          lastWheelTime.current = now;
-        }
-      }
-    };
-
-    // Touch event handlers for mobile
-    const handleTouchStart = (e: TouchEvent, element: 'hour' | 'minute') => {
-      touchStart.current = {
-        y: e.touches[0].clientY,
-        element: element
-      };
-    };
-
-    const handleTouchMove = (e: TouchEvent) => {
-      e.preventDefault(); // Prevent default scrolling
-      
-      if (!touchStart.current.element) return;
-      
-      const now = Date.now();
-      if (now - lastTouchTime.current < touchThrottle) return;
-      
-      const currentY = e.touches[0].clientY;
-      const deltaY = touchStart.current.y - currentY;
-      const threshold = 30; // Increased minimum distance to trigger scroll
-      
-      if (Math.abs(deltaY) > threshold) {
-        const direction = deltaY > 0 ? 'down' : 'up'; // Swipe up = 'down' (increase), swipe down = 'up' (decrease)
-        
-        if (touchStart.current.element === 'hour') {
-          handleHourScroll(direction);
-        } else if (touchStart.current.element === 'minute') {
-          handleMinuteScroll(direction);
-        }
-        
-        // Reset touch start for next gesture
-        touchStart.current.y = currentY;
-        lastTouchTime.current = now;
-      }
-    };
-
-    const handleTouchEnd = () => {
-      touchStart.current.element = null;
-    };
-
-    // Add wheel event listeners with passive: false
-    if (hourElement) {
-      hourElement.addEventListener('wheel', handleHourWheel, { passive: false });
-      hourElement.addEventListener('touchstart', (e) => handleTouchStart(e, 'hour'), { passive: false });
-      hourElement.addEventListener('touchmove', handleTouchMove, { passive: false });
-      hourElement.addEventListener('touchend', handleTouchEnd);
-    }
-    if (minuteElement) {
-      minuteElement.addEventListener('wheel', handleMinuteWheel, { passive: false });
-      minuteElement.addEventListener('touchstart', (e) => handleTouchStart(e, 'minute'), { passive: false });
-      minuteElement.addEventListener('touchmove', handleTouchMove, { passive: false });
-      minuteElement.addEventListener('touchend', handleTouchEnd);
-    }
-
-    // Cleanup
-    return () => {
-      if (hourElement) {
-        hourElement.removeEventListener('wheel', handleHourWheel);
-        hourElement.removeEventListener('touchstart', (e) => handleTouchStart(e, 'hour'));
-        hourElement.removeEventListener('touchmove', handleTouchMove);
-        hourElement.removeEventListener('touchend', handleTouchEnd);
-      }
-      if (minuteElement) {
-        minuteElement.removeEventListener('wheel', handleMinuteWheel);
-        minuteElement.removeEventListener('touchstart', (e) => handleTouchStart(e, 'minute'));
-        minuteElement.removeEventListener('touchmove', handleTouchMove);
-        minuteElement.removeEventListener('touchend', handleTouchEnd);
-      }
-    };
-  }, [handleHourScroll, handleMinuteScroll]);
-
-  // Initial scroll to selected values when picker opens
-  useEffect(() => {
-    // Use requestAnimationFrame for better performance than setTimeout
-    requestAnimationFrame(() => {
-      const buttonHeight = 44;
-      
-      // Scroll hour to selected value
-      const hourElement = hourWheelRef.current;
-      if (hourElement) {
-        const hourIndex = hours.indexOf(selectedHour);
-        if (hourIndex !== -1) {
-          const containerHeight = hourElement.clientHeight;
-          const topPadding = 40; // h-10 = 40px
-          const centerOffset = (containerHeight - buttonHeight) / 2;
-          const maxScrollTop = hourElement.scrollHeight - containerHeight;
-          const scrollTop = topPadding + (hourIndex * buttonHeight) - centerOffset;
-          hourElement.scrollTo({
-            top: Math.max(0, Math.min(maxScrollTop, scrollTop)),
-            behavior: 'auto'
-          });
-        }
-      }
-
-      // Scroll minute to selected value
-      const minuteElement = minuteWheelRef.current;
-      if (minuteElement) {
-        const minuteIndex = minutes.indexOf(selectedMinute);
-        if (minuteIndex !== -1) {
-          const containerHeight = minuteElement.clientHeight;
-          const topPadding = 40; // h-10 = 40px
-          const centerOffset = (containerHeight - buttonHeight) / 2;
-          const maxScrollTop = minuteElement.scrollHeight - containerHeight;
-          const scrollTop = topPadding + (minuteIndex * buttonHeight) - centerOffset;
-          minuteElement.scrollTo({
-            top: Math.max(0, Math.min(maxScrollTop, scrollTop)),
-            behavior: 'auto'
-          });
-        }
-      }
-    });
-  }, []); // Only run once when component mounts
-
-  const handleConfirm = () => {
-    let timeStr;
-    const safeHour = selectedHour ?? 9;
-    const safeMinute = selectedMinute ?? 0;
-    const safePeriod = selectedPeriod ?? 'AM';
-    
-    if (is24h) {
-      timeStr = `${safeHour.toString().padStart(2, '0')}:${safeMinute.toString().padStart(2, '0')}:00`;
+      setTimeInput(cleanValue);
     } else {
-      let hour24 = safeHour;
-      if (safePeriod === 'AM' && safeHour === 12) hour24 = 0;
-      if (safePeriod === 'PM' && safeHour !== 12) hour24 = safeHour + 12;
-      timeStr = `${hour24.toString().padStart(2, '0')}:${safeMinute.toString().padStart(2, '0')}:00`;
+      // No colon, auto-format based on length
+      const digits = cleanValue;
+      
+      if (digits.length <= 4) {
+        setTimeInput(digits);
+        
+        if (digits.length >= 2) {
+          let hour, minute;
+          
+          if (digits.length === 3) {
+            // Handle "100" -> "1:00" case
+            hour = parseInt(digits.slice(0, 1), 10);
+            minute = parseInt(digits.slice(1, 3), 10);
+          } else {
+            hour = parseInt(digits.slice(0, 2), 10);
+            minute = parseInt(digits.slice(2, 4) || '0', 10);
+          }
+          
+          // Update the display without switching format yet
+          if (is24h) {
+            if (hour >= 0 && hour <= 23) {
+              setSelectedHour(hour);
+            }
+          } else {
+            if (hour >= 1 && hour <= 12) {
+              setSelectedHour(hour);
+            } else if (hour > 12 && hour <= 23) {
+              setSelectedHour(hour - 12);
+              setSelectedPeriod('PM');
+            }
+          }
+          
+          if (minute >= 0 && minute <= 59) {
+            setSelectedMinute(minute);
+          }
+        }
+      }
     }
+  }, [is24h]);
+
+  // Format time input with colon
+  const formatTimeInput = useCallback((input: string) => {
+    const digits = input.replace(/\D/g, '');
+    if (digits.length <= 2) {
+      return digits;
+    } else if (digits.length <= 4) {
+      return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+    }
+    return input;
+  }, []);
+
+  const handleHourChange = useCallback((delta: number) => {
+    if (is24h) {
+      setSelectedHour(prev => {
+        const newHour = prev + delta;
+        if (newHour < 0) return 23;
+        if (newHour > 23) return 0;
+        return newHour;
+      });
+    } else {
+      setSelectedHour(prev => {
+        const newHour = prev + delta;
+        if (newHour < 1) return 12;
+        if (newHour > 12) return 1;
+        return newHour;
+      });
+    }
+  }, [is24h]);
+
+  const handleMinuteChange = useCallback((delta: number) => {
+    setSelectedMinute(prev => {
+      const newMinute = prev + delta;
+      if (newMinute < 0) return 59;
+      if (newMinute > 59) return 0;
+      return newMinute;
+    });
+  }, []);
+
+  const handleConfirm = useCallback(() => {
+    // Check if user typed a 24-hour format time (13-23) while in 12h mode
+    if (!is24h && onFormatChange) {
+      const digits = timeInput.replace(/\D/g, '');
+      if (digits.length >= 2) {
+        const hour = parseInt(digits.slice(0, 2), 10);
+        if (hour >= 13 && hour <= 23) {
+          // User typed 24-hour format, switch to 24h mode
+          onFormatChange(true);
+          // Use the 24-hour time directly
+          const minute = parseInt(digits.slice(2, 4) || '0', 10);
+          const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00`;
+          onSelect(timeStr);
+          return;
+        }
+      }
+    }
+    
+    let hour24 = selectedHour;
+    
+    if (!is24h) {
+      // Convert 12h to 24h
+      if (selectedPeriod === 'AM' && selectedHour === 12) {
+        hour24 = 0;
+      } else if (selectedPeriod === 'PM' && selectedHour !== 12) {
+        hour24 = selectedHour + 12;
+      }
+    }
+    
+    const timeStr = `${hour24.toString().padStart(2, '0')}:${selectedMinute.toString().padStart(2, '0')}:00`;
     onSelect(timeStr);
-  };
+  }, [selectedHour, selectedMinute, selectedPeriod, is24h, timeInput, onSelect, onFormatChange]);
+
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleConfirm();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleConfirm, onClose]);
+
+  const formatDisplayTime = useCallback(() => {
+    if (is24h) {
+      return `${selectedHour.toString().padStart(2, '0')}:${selectedMinute.toString().padStart(2, '0')}`;
+    } else {
+      return `${selectedHour}:${selectedMinute.toString().padStart(2, '0')} ${selectedPeriod}`;
+    }
+  }, [selectedHour, selectedMinute, selectedPeriod, is24h]);
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-card dark:bg-slate-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-border dark:border-slate-700">
-        <div className="flex items-center justify-between mb-4">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-background dark:bg-slate-800 rounded-2xl shadow-2xl border border-border dark:border-slate-700 w-full max-w-sm">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-border dark:border-slate-700">
           <h3 className="text-lg font-semibold text-foreground dark:text-slate-100">
             {title}
           </h3>
-          <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        
-        {/* Time Picker Wheels */}
-        <div className={`flex gap-2 mb-6 ${is24h ? 'grid-cols-2' : 'grid-cols-3'}`}>
-          {/* Hour Wheel */}
-          <div className="flex-1">
-            <div className="text-xs font-medium text-muted-foreground mb-2 text-center">
-              Hour
-            </div>
-            <div className="relative">
-              {/* Scroll up arrow - decreases number */}
+          <div className="flex items-center gap-3">
+            {/* Time Format Toggle */}
+            <div className="bg-muted/50 dark:bg-slate-700/50 rounded-lg p-1 flex items-center gap-1">
               <button
-                type="button"
-                onClick={() => handleHourScroll('up')}
-                className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-card via-card to-transparent dark:from-slate-800 dark:via-slate-800 dark:to-transparent h-8 flex items-center justify-center hover:bg-muted/50 transition-colors"
+                onClick={() => {
+                  if (is24h) {
+                    // Converting from 24h to 12h
+                    let hour12 = selectedHour;
+                    let period = 'AM';
+                    
+                    if (selectedHour === 0) {
+                      hour12 = 12;
+                      period = 'AM';
+                    } else if (selectedHour < 12) {
+                      hour12 = selectedHour;
+                      period = 'AM';
+                    } else if (selectedHour === 12) {
+                      hour12 = 12;
+                      period = 'PM';
+                    } else {
+                      hour12 = selectedHour - 12;
+                      period = 'PM';
+                    }
+                    
+                    setSelectedHour(hour12);
+                    setSelectedPeriod(period as 'AM' | 'PM');
+                    setTimeInput(`${hour12}:${selectedMinute.toString().padStart(2, '0')} ${period}`);
+                  }
+                  
+                  onFormatChange?.(false);
+                  // Focus the input after format change
+                  setTimeout(() => {
+                    const input = document.querySelector('input[type="text"]') as HTMLInputElement;
+                    if (input) {
+                      input.focus();
+                      input.select();
+                    }
+                  }, 50);
+                }}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
+                  !is24h
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                }`}
               >
-                <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                </svg>
+                12h
               </button>
-              
-              <div 
-                ref={hourWheelRef}
-                className="h-32 overflow-y-auto rounded-lg border border-border dark:border-slate-600 bg-muted/30 dark:bg-slate-700/30 scrollbar-hide"
+              <button
+                onClick={() => {
+                  if (!is24h) {
+                    // Converting from 12h to 24h
+                    let hour24 = selectedHour;
+                    
+                    if (selectedPeriod === 'AM' && selectedHour === 12) {
+                      hour24 = 0;
+                    } else if (selectedPeriod === 'PM' && selectedHour !== 12) {
+                      hour24 = selectedHour + 12;
+                    }
+                    
+                    setSelectedHour(hour24);
+                    setTimeInput(`${hour24.toString().padStart(2, '0')}:${selectedMinute.toString().padStart(2, '0')}`);
+                  }
+                  
+                  onFormatChange?.(true);
+                  // Focus the input after format change
+                  setTimeout(() => {
+                    const input = document.querySelector('input[type="text"]') as HTMLInputElement;
+                    if (input) {
+                      input.focus();
+                      input.select();
+                    }
+                  }, 50);
+                }}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
+                  is24h
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                }`}
               >
-                {/* Top padding to allow first item to be centered */}
-                <div className="h-10"></div>
-                {hours.map((hour) => (
+                24h
+              </button>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-muted/50 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Time Display */}
+        <div className="p-6 text-center">
+          <div className="text-4xl font-bold text-foreground dark:text-slate-100 font-mono mb-6">
+            <div className="flex items-center justify-center gap-2">
+              <input
+                type="text"
+                value={isInputMode ? timeInput : formatDisplayTime()}
+                onChange={(e) => {
+                  setIsInputMode(true);
+                  handleTimeInputChange(e.target.value);
+                }}
+                onFocus={() => {
+                  setIsInputMode(true);
+                  if (!timeInput) {
+                    setTimeInput('');
+                  }
+                }}
+                onBlur={() => {
+                  setIsInputMode(false);
+                  setTimeInput(formatDisplayTime());
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    handleHourChange(1);
+                  } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    handleHourChange(-1);
+                  } else if (e.key === 'Tab' && !e.shiftKey) {
+                    e.preventDefault();
+                    document.querySelector('button[data-confirm]')?.focus();
+                  }
+                }}
+                className="w-36 text-center bg-transparent border-none outline-none focus:bg-muted/20 dark:focus:bg-slate-700/50 rounded-lg px-4 py-2"
+                placeholder={is24h ? "09:00" : "9:00 AM"}
+                maxLength={is24h ? 6 : 9}
+                autoFocus
+              />
+              {!is24h && (
+                <div className="flex bg-muted/50 dark:bg-slate-700 rounded-lg p-1">
                   <button
-                    key={hour}
-                    onClick={() => setSelectedHour(hour)}
-                    className={`w-full px-3 py-2 text-center hover:bg-muted dark:hover:bg-slate-600 transition-colors ${
-                      selectedHour === hour 
-                        ? 'bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground font-medium' 
-                        : 'text-foreground dark:text-slate-200'
+                    onClick={() => setSelectedPeriod('AM')}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Tab' && e.shiftKey) {
+                        e.preventDefault();
+                        document.querySelector('input[type="text"]')?.focus();
+                      }
+                    }}
+                    data-period-input
+                    className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                      selectedPeriod === 'AM'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
-                    {is24h ? hour.toString().padStart(2, '0') : hour}
+                    AM
                   </button>
-                ))}
-                {/* Bottom padding to allow last item to be centered */}
-                <div className="h-10"></div>
-              </div>
-
-              {/* Scroll down arrow - increases number */}
-              <button
-                type="button"
-                onClick={() => handleHourScroll('down')}
-                className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-card via-card to-transparent dark:from-slate-800 dark:via-slate-800 dark:to-transparent h-8 flex items-center justify-center hover:bg-muted/50 transition-colors"
-              >
-                <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {/* Minute Wheel */}
-          <div className="flex-1">
-            <div className="text-xs font-medium text-muted-foreground mb-2 text-center">
-              Minute
-            </div>
-            <div className="relative">
-              {/* Scroll up arrow - decreases number */}
-              <button
-                type="button"
-                onClick={() => handleMinuteScroll('up')}
-                className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-card via-card to-transparent dark:from-slate-800 dark:via-slate-800 dark:to-transparent h-8 flex items-center justify-center hover:bg-muted/50 transition-colors"
-              >
-                <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                </svg>
-              </button>
-
-              <div 
-                ref={minuteWheelRef}
-                className="h-32 overflow-y-auto rounded-lg border border-border dark:border-slate-600 bg-muted/30 dark:bg-slate-700/30 scrollbar-hide"
-              >
-                {/* Top padding to allow first item to be centered */}
-                <div className="h-10"></div>
-                {minutes.map((minute) => (
                   <button
-                    key={minute}
-                    onClick={() => setSelectedMinute(minute)}
-                    className={`w-full px-3 py-2 text-center hover:bg-muted dark:hover:bg-slate-600 transition-colors ${
-                      selectedMinute === minute 
-                        ? 'bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground font-medium' 
-                        : 'text-foreground dark:text-slate-200'
+                    onClick={() => setSelectedPeriod('PM')}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Tab' && !e.shiftKey) {
+                        e.preventDefault();
+                        document.querySelector('button[data-confirm]')?.focus();
+                      }
+                    }}
+                    className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                      selectedPeriod === 'PM'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
-                    {minute.toString().padStart(2, '0')}
+                    PM
                   </button>
-                ))}
-                {/* Bottom padding to allow last item to be centered */}
-                <div className="h-10"></div>
-              </div>
-
-              {/* Scroll down arrow - increases number */}
-              <button
-                type="button"
-                onClick={() => handleMinuteScroll('down')}
-                className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-card via-card to-transparent dark:from-slate-800 dark:via-slate-800 dark:to-transparent h-8 flex items-center justify-center hover:bg-muted/50 transition-colors"
-              >
-                <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* AM/PM Toggle (12h only) */}
-          {!is24h && (
-            <div className="flex-1">
-              <div className="text-xs font-medium text-muted-foreground mb-2 text-center">
-                Period
-              </div>
-              <div className="h-32 flex flex-col gap-2 justify-center px-1">
+          {/* Time Controls */}
+          <div className="space-y-6">
+            {/* Hours */}
+            <div className="flex items-center justify-center gap-4">
+              <span className="text-sm font-medium text-muted-foreground w-12">Hour</span>
+              <div className="flex items-center gap-2">
                 <button
-                  type="button"
-                  onClick={() => setSelectedPeriod('AM')}
-                  className={`px-3 py-3 rounded-lg transition-colors text-sm font-medium ${
-                    selectedPeriod === 'AM' 
-                      ? 'bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground' 
-                      : 'bg-muted/30 dark:bg-slate-700/30 text-foreground dark:text-slate-200 hover:bg-muted dark:hover:bg-slate-600'
-                  }`}
+                  onClick={() => handleHourChange(-1)}
+                  className="w-10 h-10 rounded-lg bg-muted/50 dark:bg-slate-700 hover:bg-muted dark:hover:bg-slate-600 flex items-center justify-center transition-colors"
                 >
-                  AM
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                  </svg>
                 </button>
+                <div className="w-16 text-center">
+                  <input
+                    type="number"
+                    value={selectedHour}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value, 10);
+                      if (!isNaN(value)) {
+                        if (is24h) {
+                          if (value >= 0 && value <= 23) {
+                            setSelectedHour(value);
+                          } else if (value > 23) {
+                            setSelectedHour(23);
+                          } else if (value < 0) {
+                            setSelectedHour(0);
+                          }
+                        } else {
+                          if (value >= 1 && value <= 12) {
+                            setSelectedHour(value);
+                          } else if (value > 12) {
+                            setSelectedHour(12);
+                          } else if (value < 1) {
+                            setSelectedHour(1);
+                          }
+                        }
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        handleHourChange(1);
+                      } else if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        handleHourChange(-1);
+                      }
+                    }}
+                    className="w-full text-2xl font-bold text-center bg-transparent border-none outline-none text-foreground dark:text-slate-100 focus:bg-muted/20 dark:focus:bg-slate-700/50 rounded-lg px-2 py-1"
+                    min={is24h ? 0 : 1}
+                    max={is24h ? 23 : 12}
+                    step={1}
+                  />
+                </div>
                 <button
-                  type="button"
-                  onClick={() => setSelectedPeriod('PM')}
-                  className={`px-3 py-3 rounded-lg transition-colors text-sm font-medium ${
-                    selectedPeriod === 'PM' 
-                      ? 'bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground' 
-                      : 'bg-muted/30 dark:bg-slate-700/30 text-foreground dark:text-slate-200 hover:bg-muted dark:hover:bg-slate-600'
-                  }`}
+                  onClick={() => handleHourChange(1)}
+                  className="w-10 h-10 rounded-lg bg-muted/50 dark:bg-slate-700 hover:bg-muted dark:hover:bg-slate-600 flex items-center justify-center transition-colors"
                 >
-                  PM
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
                 </button>
               </div>
             </div>
-          )}
-        </div>
 
-        {/* Preview */}
-        <div className="mb-4 text-center">
-          <div className="text-sm text-muted-foreground mb-1">Selected Time</div>
-          <div className="text-xl font-mono font-bold text-foreground dark:text-slate-100">
-            {is24h 
-              ? `${(selectedHour ?? 9).toString().padStart(2, '0')}:${(selectedMinute ?? 0).toString().padStart(2, '0')}`
-              : `${selectedHour ?? 9}:${(selectedMinute ?? 0).toString().padStart(2, '0')} ${selectedPeriod ?? 'AM'}`
-            }
+            {/* Minutes */}
+            <div className="flex items-center justify-center gap-4">
+              <span className="text-sm font-medium text-muted-foreground w-12">Min</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleMinuteChange(-1)}
+                  className="w-10 h-10 rounded-lg bg-muted/50 dark:bg-slate-700 hover:bg-muted dark:hover:bg-slate-600 flex items-center justify-center transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                  </svg>
+                </button>
+                <div className="w-16 text-center">
+                  <input
+                    type="number"
+                    value={selectedMinute}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value, 10);
+                      if (!isNaN(value)) {
+                        if (value >= 0 && value <= 59) {
+                          setSelectedMinute(value);
+                        } else if (value > 59) {
+                          setSelectedMinute(59);
+                        } else if (value < 0) {
+                          setSelectedMinute(0);
+                        }
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        handleMinuteChange(1);
+                      } else if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        handleMinuteChange(-1);
+                      }
+                    }}
+                    className="w-full text-2xl font-bold text-center bg-transparent border-none outline-none text-foreground dark:text-slate-100 focus:bg-muted/20 dark:focus:bg-slate-700/50 rounded-lg px-2 py-1"
+                    min={0}
+                    max={59}
+                    step={1}
+                  />
+                </div>
+                <button
+                  onClick={() => handleMinuteChange(1)}
+                  className="w-10 h-10 rounded-lg bg-muted/50 dark:bg-slate-700 hover:bg-muted dark:hover:bg-slate-600 flex items-center justify-center transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* AM/PM for 12h format */}
+            {!is24h && (
+              <div className="flex items-center justify-center gap-4">
+                <span className="text-sm font-medium text-muted-foreground w-12">Period</span>
+                <div className="flex bg-muted/50 dark:bg-slate-700 rounded-lg p-1">
+                  <button
+                    onClick={() => setSelectedPeriod('AM')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      selectedPeriod === 'AM'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    AM
+                  </button>
+                  <button
+                    onClick={() => setSelectedPeriod('PM')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      selectedPeriod === 'PM'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    PM
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
-        
-        {/* Action Buttons */}
-        <div className="flex gap-3">
+
+        {/* Footer */}
+        <div className="flex gap-3 p-6 border-t border-border dark:border-slate-700">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 bg-muted dark:bg-slate-700 text-foreground dark:text-slate-200 rounded-lg hover:bg-muted/80 dark:hover:bg-slate-600 transition-colors"
+            className="flex-1 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground bg-muted/50 hover:bg-muted dark:bg-slate-700/50 dark:hover:bg-slate-600 rounded-lg transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleConfirm}
-            className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
+            data-confirm
+            className="flex-1 px-4 py-3 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition-colors"
           >
-            Set Time
+            Confirm
           </button>
         </div>
       </div>

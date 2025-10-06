@@ -71,12 +71,30 @@ export default function PrivacyPage() {
               <li>Pages visited and time spent on the site</li>
               <li>Device type, browser, and operating system</li>
               <li>General location (city-level, anonymized IP)</li>
+              <li>Your timezone (e.g., "America/New_York") for usage analytics</li>
               <li>Traffic sources (e.g., search engines, social media, direct visits)</li>
             </ul>
 
             <hr className="my-6 border-border/50 dark:border-slate-700/50" />
 
-            <h2 className="text-2xl font-semibold mb-4">2. How We Use This Information</h2>
+            <h2 className="text-2xl font-semibold mb-4">2. Calculator Usage Analytics</h2>
+            <p className="mb-4">
+              To improve the calculator's functionality and user experience, we track anonymous usage patterns, including:
+            </p>
+            <ul className="mb-4">
+              <li>When calculations are performed (without storing the actual time values you enter)</li>
+              <li>Whether calculations span multiple days (overnight shifts)</li>
+              <li>Usage of features like clearing calculation history</li>
+              <li>General interaction patterns with the calculator interface</li>
+              <li>Duration of calculations performed (for performance optimization)</li>
+            </ul>
+            <p className="mb-6">
+              <strong>Important:</strong> No actual time values you enter are ever transmitted, stored, or analyzed. We only collect derived metrics and anonymous usage patterns.
+            </p>
+
+            <hr className="my-6 border-border/50 dark:border-slate-700/50" />
+
+            <h2 className="text-2xl font-semibold mb-4">3. How We Use This Information</h2>
             <p className="mb-4">We use this data only to:</p>
             <ul className="mb-4">
               <li>Monitor site performance</li>
@@ -90,7 +108,7 @@ export default function PrivacyPage() {
 
             <hr className="my-6 border-border/50 dark:border-slate-700/50" />
 
-            <h2 className="text-2xl font-semibold mb-4">3. Google Analytics & Search Console</h2>
+            <h2 className="text-2xl font-semibold mb-4">4. Google Analytics & Search Console</h2>
             <p className="mb-4">
               ClockMath uses Google Analytics and Search Console to track and analyze website traffic. We have enabled the following baseline features:
             </p>
@@ -116,7 +134,7 @@ export default function PrivacyPage() {
 
             <hr className="my-6 border-border/50 dark:border-slate-700/50" />
 
-            <h2 className="text-2xl font-semibold mb-4">4. Cookies</h2>
+            <h2 className="text-2xl font-semibold mb-4">5. Cookies</h2>
             <p className="mb-4">
               ClockMath uses cookies only to support basic analytics tracking. Cookies are small files stored on your device that help us understand how visitors interact with the site.
             </p>
@@ -126,14 +144,14 @@ export default function PrivacyPage() {
 
             <hr className="my-6 border-border/50 dark:border-slate-700/50" />
 
-            <h2 className="text-2xl font-semibold mb-4">5. Third-Party Links</h2>
+            <h2 className="text-2xl font-semibold mb-4">6. Third-Party Links</h2>
             <p className="mb-6">
               Our site may link to external websites. We are not responsible for the privacy practices of third parties.
             </p>
 
             <hr className="my-6 border-border/50 dark:border-slate-700/50" />
 
-            <h2 className="text-2xl font-semibold mb-4">6. Your Rights</h2>
+            <h2 className="text-2xl font-semibold mb-4">7. Your Rights</h2>
             <p className="mb-4">
               Depending on your location, you may have the right to request:
             </p>
@@ -154,7 +172,7 @@ export default function PrivacyPage() {
 
             <hr className="my-6 border-border/50 dark:border-slate-700/50" />
 
-            <h2 className="text-2xl font-semibold mb-4">7. Updates</h2>
+            <h2 className="text-2xl font-semibold mb-4">8. Updates</h2>
             <p className="mb-6">
               We may update this Privacy Policy from time to time. Updates will be posted here with a new effective date.
             </p>
