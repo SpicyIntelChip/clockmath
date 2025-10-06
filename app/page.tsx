@@ -5,7 +5,8 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import SeoIntro from "@/components/SeoIntro"
 import SiteFooter from "@/components/SiteFooter"
 import PageChrome from "@/components/PageChrome"
-import { CustomTimePicker } from "@/components/ui/CustomTimePicker"
+import { InlineTimePicker } from "@/components/ui/InlineTimePicker"
+import { DetailedDurationBreakdown } from "@/components/DetailedDurationBreakdown"
 import { event as gaEvent } from "@/lib/gtag"
 
 // Interface for calculator-specific data
@@ -15,6 +16,15 @@ interface CalculationHistory {
   endTime: string
   assumeNextDay: boolean
   result: string
+  seconds?: number // Raw seconds value for efficient sum calculations (optional for backward compatibility)
+  detailedResult?: {
+    years: number
+    months: number
+    days: number
+    hours: number
+    minutes: number
+    seconds: number
+  }
   timestamp: Date
 }
 
@@ -32,13 +42,29 @@ export default function ClockMathPage() {
   const [assumeNextDay, setAssumeNextDay] = useState(false)
   const [result, setResult] = useState("")
   const [history, setHistory] = useState<CalculationHistory[]>([])
-  const [is24HourFormat, setIs24HourFormat] = useState(true)
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [isCalculating, setIsCalculating] = useState(false)
-  const [startTimeValid, setStartTimeValid] = useState(true)
-  const [endTimeValid, setEndTimeValid] = useState(true)
-  // Removed activeTab state since we no longer have tab switching
-  const [prominentElapsed, setProminentElapsed] = useState<string | null>(null);
+  const [expandedHistory, setExpandedHistory] = useState<Set<string>>(new Set());
+  const [selectedCalculations, setSelectedCalculations] = useState<Set<string>>(new Set());
+  const [currentDetailedResult, setCurrentDetailedResult] = useState<{
+    years: number
+    months: number
+    days: number
+    hours: number
+    minutes: number
+    seconds: number
+  } | null>(null);
+  const [sumResult, setSumResult] = useState<{
+    total: string
+    detailed: {
+      years: number
+      months: number
+      days: number
+      hours: number
+      minutes: number
+      seconds: number
+    }
+  } | null>(null);
 
   // Emit debounced inputs_change (no PII)
   const emitInputsChange = useCallback(() => {
@@ -74,42 +100,8 @@ export default function ClockMathPage() {
     }
   }, [isDarkMode])
 
-  // State for custom time picker (both 12h and 24h)
-  const [showCustomPicker, setShowCustomPicker] = useState<{ 
-    field: 'start' | 'end' | null;
-    is24h: boolean;
-  }>({ field: null, is24h: false });
-
-  // Helper to parse current time into components
-  const parseCurrentTime = useCallback((timeStr: string, is24h: boolean) => {
-    if (!timeStr) return { hour: is24h ? 9 : 9, minute: 0, period: 'AM' };
-    
-    const parts = timeStr.split(':');
-    let hour = parseInt(parts[0], 10) || 0;
-    const minute = parseInt(parts[1], 10) || 0;
-    
-    if (is24h) {
-      return { hour, minute, period: 'AM' };
-    } else {
-      // Convert 24h to 12h for display
-      const period = hour >= 12 ? 'PM' : 'AM';
-      const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-      return { hour: displayHour, minute, period };
-    }
-  }, []);
-
-  // Helper to format time components back to time string
-  const formatTimeComponents = useCallback((hour: number, minute: number, period: string, is24h: boolean) => {
-    if (is24h) {
-      return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00`;
-    } else {
-      // Convert 12h to 24h for storage
-      let hour24 = hour;
-      if (period === 'AM' && hour === 12) hour24 = 0;
-      if (period === 'PM' && hour !== 12) hour24 = hour + 12;
-      return `${hour24.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00`;
-    }
-  }, []);
+  // Global time format for both start and end times
+  const [is24HourFormat, setIs24HourFormat] = useState(true)
 
   const parseTimeToSeconds = useCallback((str: string): number => {
     if (!str) return Number.NaN
@@ -135,14 +127,110 @@ export default function ClockMathPage() {
     return parts.join(" ")
   }, [])
 
+  const formatDetailedDuration = useCallback((seconds: number) => {
+    if (isNaN(seconds) || seconds < 0) return null
+    
+    // Calculate all time units with appropriate precision
+    const years = seconds / (365.25 * 24 * 3600)
+    const months = seconds / (30.44 * 24 * 3600)
+    const days = seconds / (24 * 3600)
+    const hours = seconds / 3600
+    const minutes = seconds / 60
+    
+    return {
+      years: parseFloat(years.toFixed(4)),
+      months: parseFloat(months.toFixed(3)),
+      days: parseFloat(days.toFixed(2)),
+      hours: parseFloat(hours.toFixed(2)),
+      minutes: parseFloat(minutes.toFixed(1)),
+      seconds: Math.round(seconds)
+    }
+  }, [])
+
+  // Handle calculation selection
+  const toggleCalculationSelection = useCallback((id: string) => {
+    const newSelected = new Set(selectedCalculations)
+    if (newSelected.has(id)) {
+      newSelected.delete(id)
+    } else {
+      newSelected.add(id)
+    }
+    setSelectedCalculations(newSelected)
+  }, [selectedCalculations])
+
+  // Calculate sum of selected calculations
+  const calculateSum = useCallback(() => {
+    if (selectedCalculations.size === 0) return
+
+    let totalSeconds = 0
+    const selectedEntries = history.filter(entry => selectedCalculations.has(entry.id))
+    
+    selectedEntries.forEach(entry => {
+      // Use stored seconds value directly (much more efficient!)
+      if (entry.seconds && !isNaN(entry.seconds)) {
+        totalSeconds += entry.seconds
+      } else {
+        // Fallback for old entries without seconds field (backward compatibility)
+        const resultStr = entry.result
+        if (resultStr && resultStr !== "Invalid") {
+          // Parse "8h 30m" format
+          const parts = resultStr.split(' ')
+          parts.forEach(part => {
+            if (part.endsWith('h')) {
+              const hours = parseInt(part.replace('h', ''))
+              if (!isNaN(hours)) totalSeconds += hours * 3600
+            } else if (part.endsWith('m')) {
+              const minutes = parseInt(part.replace('m', ''))
+              if (!isNaN(minutes)) totalSeconds += minutes * 60
+            } else if (part.endsWith('s')) {
+              const seconds = parseInt(part.replace('s', ''))
+              if (!isNaN(seconds)) totalSeconds += seconds
+            }
+          })
+        }
+      }
+    })
+
+    const totalDuration = formatDuration(totalSeconds)
+    const detailedDuration = formatDetailedDuration(totalSeconds)
+    
+    if (detailedDuration) {
+      setSumResult({
+        total: totalDuration,
+        detailed: detailedDuration
+      })
+    }
+  }, [selectedCalculations, history, formatDuration, formatDetailedDuration])
+
+  // Clear selection
+  const clearSelection = useCallback(() => {
+    setSelectedCalculations(new Set())
+    setSumResult(null)
+  }, [])
+
   const formatTime = useCallback((timeStr: string): string => {
     if (!timeStr || timeStr.length === 0) return ""
     
-    const parts = timeStr.split(":")
-    if (parts.length < 2) return timeStr
+    // Handle edge case where timeStr might be an object or invalid data
+    if (typeof timeStr !== 'string') {
+      console.warn('Invalid timeStr type:', typeof timeStr, timeStr)
+      return ""
+    }
     
-    const hours = parseInt(parts[0]) || 0
-    const minutes = parseInt(parts[1]) || 0
+    const parts = timeStr.split(":")
+    if (parts.length < 2) {
+      console.warn('Invalid time format:', timeStr)
+      return timeStr
+    }
+    
+    const hours = parseInt(parts[0], 10)
+    const minutes = parseInt(parts[1], 10)
+    
+    // Validate parsed values
+    if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours >= 24 || minutes < 0 || minutes >= 60) {
+      console.warn('Invalid time values:', { hours, minutes, timeStr })
+      return timeStr
+    }
     
     if (is24HourFormat) {
       return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`
@@ -152,15 +240,6 @@ export default function ClockMathPage() {
       return `${displayHours}:${minutes.toString().padStart(2, "0")} ${period}`
     }
   }, [is24HourFormat])
-
-  const validateTime = useCallback((timeStr: string): boolean => {
-    if (!timeStr) return true // Empty is valid
-    const parts = timeStr.split(":")
-    if (parts.length < 2) return false
-    const hours = parseInt(parts[0])
-    const minutes = parseInt(parts[1])
-    return !isNaN(hours) && !isNaN(minutes) && hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60
-  }, [])
 
   const calculateTimeDifference = useCallback(() => {
     if (!startTime || !endTime) return
@@ -188,8 +267,9 @@ export default function ClockMathPage() {
         setResult("End time is before start time")
       } else {
         const duration = formatDuration(diffSeconds)
+        const detailedDuration = formatDetailedDuration(diffSeconds)
         setResult(duration)
-        setProminentElapsed(duration)
+        setCurrentDetailedResult(detailedDuration)
         
         // Add to history
         const newEntry: CalculationHistory = {
@@ -198,6 +278,8 @@ export default function ClockMathPage() {
           endTime,
           assumeNextDay,
           result: duration,
+          seconds: diffSeconds, // Store raw seconds for efficient sum calculations
+          detailedResult: detailedDuration || undefined,
           timestamp: new Date()
         }
         setHistory(prev => [newEntry, ...prev.slice(0, 9)]) // Keep last 10
@@ -229,7 +311,7 @@ export default function ClockMathPage() {
       
       setIsCalculating(false)
     }, 300)
-  }, [startTime, endTime, assumeNextDay, parseTimeToSeconds, formatDuration])
+  }, [startTime, endTime, assumeNextDay, parseTimeToSeconds, formatDuration, formatDetailedDuration])
 
   const toggleTheme = useCallback(() => {
     const newTheme = !isDarkMode
@@ -241,24 +323,41 @@ export default function ClockMathPage() {
   useEffect(() => {
     try {
       const saved = localStorage.getItem("clockmath-history")
-      if (saved) {
-        const parsed: StoredCalculation[] = JSON.parse(saved)
-        const converted: CalculationHistory[] = parsed.map(item => ({
+      if (!saved) return
+      
+      const parsed = JSON.parse(saved)
+      
+      // Filter out entries missing required fields and convert timestamps
+      const validEntries: CalculationHistory[] = parsed
+        .filter((item: any) => 
+          item && 
+          item.id && 
+          item.startTime && 
+          item.endTime && 
+          item.result && 
+          item.timestamp
+        )
+        .map((item: any) => ({
           ...item,
           timestamp: new Date(item.timestamp)
         }))
-        setHistory(converted)
+        .filter((item: CalculationHistory) => !isNaN(item.timestamp.getTime()))
+      
+      setHistory(validEntries)
+      
+      // Clean up localStorage if we filtered out invalid entries
+      if (validEntries.length !== parsed.length && validEntries.length > 0) {
+        const cleanedStorage: StoredCalculation[] = validEntries.map(item => ({
+          ...item,
+          timestamp: item.timestamp.toISOString()
+        }))
+        localStorage.setItem("clockmath-history", JSON.stringify(cleanedStorage))
       }
     } catch (e) {
       console.warn("Failed to load history from localStorage", e)
+      localStorage.removeItem("clockmath-history")
     }
   }, [])
-
-  // Validate times
-  useEffect(() => {
-    setStartTimeValid(validateTime(startTime))
-    setEndTimeValid(validateTime(endTime))
-  }, [startTime, endTime, validateTime])
 
   // Debounced inputs change event
   const debouncedInputsChange = useRef<NodeJS.Timeout | null>(null)
@@ -277,7 +376,7 @@ export default function ClockMathPage() {
 
   return (
     <PageChrome currentTool="calculator" onToggleTheme={toggleTheme} isDarkMode={isDarkMode}>
-      <div className="space-y-8">
+      <div className="space-y-8 pb-24">
         {/* Header */}
         <header className="text-center">
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-4">
@@ -310,8 +409,9 @@ export default function ClockMathPage() {
         </header>
 
         {/* Main Calculator Card */}
-        <div className="bg-card/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl p-6 sm:p-8 shadow-xl border border-border/50 dark:border-slate-700/50">
+        <div className="bg-card/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl p-6 sm:p-8 shadow-xl border border-border/50 dark:border-slate-700/50 min-h-[600px]">
           <div className="grid gap-6 sm:gap-8">
+
             {/* Time Format Toggle */}
             <div className="flex items-center justify-center">
               <div className="bg-muted/50 dark:bg-slate-700/50 rounded-xl p-1.5 flex items-center gap-1">
@@ -345,31 +445,12 @@ export default function ClockMathPage() {
                 <label className="block text-sm font-medium text-foreground dark:text-slate-100">
                   Start Time
                 </label>
-                <div className="relative">
-                  <button
-                    onClick={() => setShowCustomPicker({ field: 'start', is24h: is24HourFormat })}
-                    className={`w-full px-4 py-3 text-left bg-background dark:bg-slate-700 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                      startTimeValid
-                        ? "border-border dark:border-slate-600 hover:border-primary/50"
-                        : "border-red-500 dark:border-red-400"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className={`font-mono text-lg ${startTime ? "text-foreground dark:text-slate-100" : "text-muted-foreground"}`}>
-                        {startTime ? formatTime(startTime) : "Select time"}
-                      </span>
-                      <svg className="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <circle cx="12" cy="12" r="10" />
-                        <polyline points="12,6 12,12 16,14" />
-                      </svg>
-                    </div>
-                  </button>
-                  {!startTimeValid && (
-                    <p className="text-sm text-red-600 dark:text-red-400 mt-1">
-                      Please enter a valid time
-                    </p>
-                  )}
-                </div>
+                <InlineTimePicker
+                  value={startTime}
+                  onChange={setStartTime}
+                  is24h={is24HourFormat}
+                  placeholder="Select start time"
+                />
               </div>
 
               {/* End Time */}
@@ -377,31 +458,12 @@ export default function ClockMathPage() {
                 <label className="block text-sm font-medium text-foreground dark:text-slate-100">
                   End Time
                 </label>
-                <div className="relative">
-                  <button
-                    onClick={() => setShowCustomPicker({ field: 'end', is24h: is24HourFormat })}
-                    className={`w-full px-4 py-3 text-left bg-background dark:bg-slate-700 border rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                      endTimeValid
-                        ? "border-border dark:border-slate-600 hover:border-primary/50"
-                        : "border-red-500 dark:border-red-400"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className={`font-mono text-lg ${endTime ? "text-foreground dark:text-slate-100" : "text-muted-foreground"}`}>
-                        {endTime ? formatTime(endTime) : "Select time"}
-                      </span>
-                      <svg className="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <circle cx="12" cy="12" r="10" />
-                        <polyline points="12,6 12,12 16,14" />
-                      </svg>
-                    </div>
-                  </button>
-                  {!endTimeValid && (
-                    <p className="text-sm text-red-600 dark:text-red-400 mt-1">
-                      Please enter a valid time
-                    </p>
-                  )}
-                </div>
+                <InlineTimePicker
+                  value={endTime}
+                  onChange={setEndTime}
+                  is24h={is24HourFormat}
+                  placeholder="Select end time"
+                />
               </div>
             </div>
 
@@ -436,7 +498,7 @@ export default function ClockMathPage() {
             {/* Calculate Button */}
             <button
               onClick={calculateTimeDifference}
-              disabled={!startTimeValid || !endTimeValid || !startTime || !endTime || isCalculating}
+              disabled={!startTime || !endTime || isCalculating}
               className="w-full bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 disabled:from-muted disabled:to-muted disabled:text-muted-foreground text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl disabled:shadow-none disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isCalculating ? (
@@ -459,12 +521,23 @@ export default function ClockMathPage() {
             {result && (
               <div className="text-center">
                 <div className="bg-gradient-to-r from-emerald-50 to-blue-50 dark:from-emerald-900/20 dark:to-blue-900/20 rounded-xl p-6 border border-emerald-200 dark:border-emerald-800">
-                  <h3 className="text-lg font-semibold text-emerald-800 dark:text-emerald-200 mb-2">
+                  <h3 className="text-lg font-semibold text-emerald-800 dark:text-emerald-200 mb-4">
                     Duration
                   </h3>
-                  <p className="text-3xl font-bold text-emerald-900 dark:text-emerald-100 font-mono">
+                  
+                  {/* Main duration (hours and minutes) - largest and centered */}
+                  <p className="text-4xl font-bold text-emerald-900 dark:text-emerald-100 font-mono mb-4">
                     {result}
                   </p>
+                  
+                  {/* Detailed breakdown - smaller, for interest/fun */}
+                  {currentDetailedResult && (
+                    <DetailedDurationBreakdown 
+                      detailedResult={currentDetailedResult}
+                      variant="primary"
+                      size="large"
+                    />
+                  )}
                 </div>
               </div>
             )}
@@ -475,68 +548,186 @@ export default function ClockMathPage() {
         {history.length > 0 && (
           <div className="bg-card/60 dark:bg-slate-800/60 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-border/50 dark:border-slate-700/50">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-foreground dark:text-slate-100">
-                Recent Calculations
-              </h3>
-              <button
-                onClick={() => {
-                  setHistory([]);
-                  localStorage.removeItem("clockmath-history");
-                  gaEvent({
-                    action: "history_cleared",
-                    params: {
-                      page: "calculator",
-                      device: getDevice(),
-                    },
-                  });
-                }}
-                className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground bg-muted/50 hover:bg-muted dark:bg-slate-700/50 dark:hover:bg-slate-600 rounded-lg transition-colors"
-                title="Clear all calculation history"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
+              <div>
+                <h3 className="text-lg font-bold text-foreground dark:text-slate-100">
+                  Recent Calculations
+                </h3>
+                {history.length >= 2 && selectedCalculations.size === 0 && (
+                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                    <span>💡</span>
+                    <span>Tip: Select multiple calculations to sum them together</span>
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {selectedCalculations.size > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      {selectedCalculations.size} selected
+                    </span>
+                    <button
+                      onClick={calculateSum}
+                      className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors animate-in slide-in-from-right-2 duration-300"
+                    >
+                      Sum Selected
+                    </button>
+                    <button
+                      onClick={clearSelection}
+                      className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground bg-muted/50 hover:bg-muted rounded-lg transition-colors"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
+                <button
+                  onClick={() => {
+                    setHistory([]);
+                    localStorage.removeItem("clockmath-history");
+                    setSelectedCalculations(new Set());
+                    setSumResult(null);
+                    gaEvent({
+                      action: "history_cleared",
+                      params: {
+                        page: "calculator",
+                        device: getDevice(),
+                      },
+                    });
+                  }}
+                  className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground bg-muted/50 hover:bg-muted dark:bg-slate-700/50 dark:hover:bg-slate-600 rounded-lg transition-colors"
+                  title="Clear all calculation history"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
             </div>
             <div className="grid gap-3">
-              {history.slice(0, 5).map((entry) => (
-                <div
-                  key={entry.id}
-                  className="flex items-center justify-between p-3 bg-background/50 dark:bg-slate-700/50 rounded-lg"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-sm text-muted-foreground">
-                      {formatTime(entry.startTime)} → {formatTime(entry.endTime)}
-                      {entry.assumeNextDay && " (+1 day)"}
-                    </span>
+              {history.slice(0, 5).map((entry) => {
+                const startTimeFormatted = formatTime(entry.startTime)
+                const endTimeFormatted = formatTime(entry.endTime)
+                const isExpanded = expandedHistory.has(entry.id)
+                
+                const isSelected = selectedCalculations.has(entry.id)
+                
+                return (
+                  <div
+                    key={entry.id}
+                    className={`bg-background/50 dark:bg-slate-700/50 rounded-lg overflow-hidden transition-all duration-200 ${
+                      isSelected ? 'ring-2 ring-primary/50 bg-primary/5 dark:bg-primary/10' : ''
+                    }`}
+                  >
+                    <div className="flex items-center justify-between p-3">
+                      <div className="flex items-center gap-3">
+                        <label className="flex items-center cursor-pointer group" title="Click to select for summing">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleCalculationSelection(entry.id)}
+                            className="sr-only"
+                          />
+                          <div className={`w-5 h-5 rounded border-2 transition-all duration-200 ${
+                            isSelected
+                              ? 'bg-primary border-primary'
+                              : 'border-border dark:border-slate-600 hover:border-primary/50 group-hover:scale-105'
+                          }`}>
+                            {isSelected && (
+                              <svg className="w-3 h-3 text-primary-foreground absolute top-0.5 left-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <polyline points="20,6 9,17 4,12" strokeWidth="2" />
+                              </svg>
+                            )}
+                          </div>
+                        </label>
+                        <span className="font-mono text-sm text-muted-foreground">
+                          {startTimeFormatted && endTimeFormatted ? (
+                            <>
+                              {startTimeFormatted} → {endTimeFormatted}
+                              {entry.assumeNextDay && " (+1 day)"}
+                            </>
+                          ) : (
+                            <span className="text-red-500 text-xs">
+                              Invalid time data
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-semibold text-primary">
+                          {entry.result || "Invalid result"}
+                        </span>
+                        {entry.detailedResult && (
+                          <button
+                            onClick={() => {
+                              const newExpanded = new Set(expandedHistory)
+                              if (isExpanded) {
+                                newExpanded.delete(entry.id)
+                              } else {
+                                newExpanded.add(entry.id)
+                              }
+                              setExpandedHistory(newExpanded)
+                            }}
+                            className="p-1 hover:bg-muted/50 dark:hover:bg-slate-600 rounded transition-colors"
+                            title={isExpanded ? "Hide details" : "Show details"}
+                          >
+                            <svg 
+                              className={`w-4 h-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
+                              fill="none" 
+                              stroke="currentColor" 
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Expanded details */}
+                    {isExpanded && entry.detailedResult && (
+                      <div className="px-3 pb-3 border-t border-border/50 dark:border-slate-600/50">
+                        <div className="pt-3">
+                          <div className="text-xs text-muted-foreground mb-2">Detailed breakdown:</div>
+                          <DetailedDurationBreakdown 
+                            detailedResult={entry.detailedResult}
+                            variant="muted"
+                            size="small"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <span className="font-mono font-semibold text-primary">
-                    {entry.result}
-                  </span>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
 
-        {/* Custom Time Picker Modal */}
-        {showCustomPicker.field && (
-          <CustomTimePicker
-            field={showCustomPicker.field}
-            is24h={showCustomPicker.is24h}
-            currentTime={showCustomPicker.field === 'start' ? startTime : endTime}
-            onSelect={(timeStr) => {
-              if (showCustomPicker.field === 'start') {
-                setStartTime(timeStr);
-              } else {
-                setEndTime(timeStr);
-              }
-              setShowCustomPicker({ field: null, is24h: false });
-            }}
-            onClose={() => setShowCustomPicker({ field: null, is24h: false })}
-            title={`Select ${showCustomPicker.field === 'start' ? 'Start' : 'End'} Time`}
-          />
+        {/* Sum Result */}
+        {sumResult && (
+          <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-2xl p-6 shadow-lg border border-blue-200 dark:border-blue-800 animate-in fade-in-50 duration-500">
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200 mb-2">
+                Sum of Selected Calculations
+              </h3>
+              <p className="text-xs text-blue-600 dark:text-blue-400 mb-4">
+                ✨ Great! You've successfully summed {selectedCalculations.size} calculation{selectedCalculations.size !== 1 ? 's' : ''}
+              </p>
+              
+              {/* Main sum result - largest and centered */}
+              <p className="text-4xl font-bold text-blue-900 dark:text-blue-100 font-mono mb-4">
+                {sumResult.total}
+              </p>
+              
+              {/* Detailed breakdown */}
+              <DetailedDurationBreakdown 
+                detailedResult={sumResult.detailed}
+                variant="secondary"
+                size="large"
+              />
+            </div>
+          </div>
         )}
+
 
         <SeoIntro />
         <SiteFooter />

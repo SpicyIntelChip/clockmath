@@ -7,4 +7,5 @@ pages_build_output_dir = ".vercel/output/static"
 
 [vars]
 NEXT_PUBLIC_GA_ID = "G-5L3QN6938D"
+NEXT_PUBLIC_GEOAPIFY_API_KEY = "***REMOVED***"
 

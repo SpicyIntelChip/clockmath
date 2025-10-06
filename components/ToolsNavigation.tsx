@@ -17,21 +17,21 @@ const tools: ToolTab[] = [
     id: 'calculator',
     label: 'Time Calculator',
     href: '/',
-    icon: <Clock className="w-4 h-4" />,
+    icon: <Clock className="w-5 h-5 sm:w-4 sm:h-4" />,
     description: 'Calculate time between two times'
   },
   {
     id: 'timezone',
     label: 'Timezone Converter',
     href: '/tools/timezone',
-    icon: <Globe className="w-4 h-4" />,
+    icon: <Globe className="w-5 h-5 sm:w-4 sm:h-4" />,
     description: 'Convert between timezones'
   },
   {
     id: 'articles',
     label: 'Guides',
     href: '/articles',
-    icon: <BookOpen className="w-4 h-4" />,
+    icon: <BookOpen className="w-5 h-5 sm:w-4 sm:h-4" />,
     description: 'Learn best practices and scenarios'
   }
 ]
@@ -63,12 +63,12 @@ export default function ToolsNavigation({
 
   return (
     <div className={`bg-card/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl p-1 shadow-xl border border-border/50 dark:border-slate-700/50 ${className}`}>
-      <div className="flex overflow-x-auto scrollbar-hide">
+      <div className="flex overflow-x-auto scrollbar-hide min-h-[3rem]">
         {tools.map((tool) => (
           <Link
             key={tool.id}
             href={tool.href}
-            className={`flex-1 min-w-0 px-3 sm:px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
+            className={`flex-1 min-w-0 px-3 sm:px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 flex items-center gap-2 sm:gap-2 whitespace-nowrap min-h-[2.5rem] ${
               activeToolId === tool.id
                 ? "bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -83,13 +83,13 @@ export default function ToolsNavigation({
         {showHistory && (
           <button
             onClick={onHistoryClick}
-            className={`flex-1 min-w-0 px-3 sm:px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 flex items-center gap-2 whitespace-nowrap ${
+            className={`flex-1 min-w-0 px-3 sm:px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 flex items-center gap-2 sm:gap-2 whitespace-nowrap min-h-[2.5rem] ${
               currentTool === 'history'
                 ? "bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
             }`}
           >
-            <History className="w-4 h-4" />
+            <History className="w-5 h-5 sm:w-4 sm:h-4" />
             <span className="hidden sm:inline">Recent Calculations</span>
             <span className="sm:hidden">History</span>
             {historyCount > 0 && (

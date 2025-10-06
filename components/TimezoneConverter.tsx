@@ -9,7 +9,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { LocationTimezonePicker } from '@/components/location/LocationTimezonePicker';
-import { CustomTimePicker } from '@/components/ui/CustomTimePicker';
+import { InlineTimePicker } from '@/components/ui/InlineTimePicker';
 import {
   getUserTimeZone,
   getTimeZoneOptions,
@@ -44,7 +44,6 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
   } | null>(null);
   
   // Custom time picker state
-  const [showCustomTimePicker, setShowCustomTimePicker] = useState(false);
   
   // Track if component has hydrated to prevent SSR mismatch
   const [isHydrated, setIsHydrated] = useState(false);
@@ -427,13 +426,6 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
     }
   }, [hour12]);
 
-  const handleTimePickerSelect = useCallback((timeStr: string) => {
-    // timeStr comes in as "HH:mm:ss" format from the picker
-    const [hour, minute] = timeStr.split(':');
-    const formattedTime = `${hour}:${minute}`;
-    setInputTime(formattedTime);
-    setShowCustomTimePicker(false);
-  }, []);
 
   // Convert inputTime for display in the input field
   const displayTime = useMemo(() => {
@@ -506,7 +498,6 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
                 }
               }}
               onDisplayChange={(displayText) => {
-                console.log('TimezoneConverter: fromLocationDisplay updated to', displayText);
                 setFromLocationDisplay(displayText);
               }}
               defaultHint={isHydrated ? `Auto-detected: ${getUserTimeZone()}` : "Auto-detecting timezone..."}
@@ -532,7 +523,6 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
                 }
               }}
               onDisplayChange={(displayText) => {
-                console.log('TimezoneConverter: toLocationDisplay updated to', displayText);
                 setToLocationDisplay(displayText);
               }}
               defaultHint="Search for a city..."
@@ -547,7 +537,7 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
             <button
               type="button"
               onClick={handleSwapTimezones}
-              className="absolute -left-4 top-8 transform -translate-x-full sm:translate-x-0 sm:left-auto sm:right-full sm:mr-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full p-2 shadow-lg transition-all duration-200 hover:scale-105"
+              className="absolute top-8 right-2 sm:left-auto sm:right-full sm:mr-2 sm:top-8 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full p-2 shadow-lg transition-all duration-200 hover:scale-105"
               title="Swap locations"
             >
               <ArrowLeftRight className="w-4 h-4" />
@@ -637,36 +627,17 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
             <label htmlFor="time-input" className="block text-xs text-muted-foreground">
               Time
             </label>
-            <div className="relative">
-              <input
-                id="time-input"
-                type="text"
-                value={displayTime}
-                onChange={(e) => {
-                  const input = e.target.value;
-                  if (hour12) {
-                    // For 12h format, convert to 24h before storing
-                    const converted = convertTo24Hour(input);
-                    setInputTime(converted || input);
-                  } else {
-                    // For 24h format, store directly but validate
-                    if (input === "" || /^(\d{0,2}):?(\d{0,2})$/.test(input)) {
-                      setInputTime(input);
-                    }
-                  }
-                }}
-                placeholder={hour12 ? "9:00 AM" : "09:00"}
-                className="w-full px-3 py-3 bg-input dark:bg-slate-700 border-2 border-border dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 text-sm font-mono shadow-sm dark:text-slate-100"
-              />
-              <button
-                type="button"
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors z-30"
-                onClick={() => setShowCustomTimePicker(true)}
-                tabIndex={-1}
-              >
-                <Clock className="w-4 h-4" />
-              </button>
-            </div>
+            <InlineTimePicker
+              value={inputTime && inputTime.trim() ? `${inputTime.trim()}:00` : "09:00:00"}
+              onChange={(timeStr) => {
+                // timeStr comes in as "HH:mm:ss" format, extract just "HH:mm"
+                const [hour, minute] = timeStr.split(':');
+                const formattedTime = `${hour}:${minute}`;
+                setInputTime(formattedTime);
+              }}
+              is24h={!hour12}
+              placeholder={hour12 ? "9:00 AM" : "09:00"}
+            />
           </div>
         </div>
         
@@ -750,17 +721,6 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
         </p>
       </div>
 
-      {/* Custom Time Picker Modal */}
-      {showCustomTimePicker && (
-        <CustomTimePicker
-          field="time"
-          is24h={!hour12}
-          currentTime={inputTime && inputTime.trim() ? `${inputTime.trim()}:00` : "09:00:00"}
-          onSelect={handleTimePickerSelect}
-          onClose={() => setShowCustomTimePicker(false)}
-          title="Select Time"
-        />
-      )}
     </div>
   );
 }

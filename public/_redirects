@@ -1,8 +1,8 @@
 # Cloudflare Pages redirect rules for ClockMath.com
-# These rules enforce non-www domain and trailing slashes
+# Note: Cloudflare Pages does not support the ! syntax
 
 # Force non-www domain (301 redirects)
-https://www.clockmath.com/* https://clockmath.com/:splat 301!
+https://www.clockmath.com/* https://clockmath.com/:splat 301
 
 # Legacy redirects if any old URLs exist
 /timezone-converter /tools/timezone/ 301
