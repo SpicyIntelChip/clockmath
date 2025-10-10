@@ -428,6 +428,12 @@ export function InlineTimePicker({
                   // Parse the input and update internal state
                   if (timeInput) {
                     parseAndApplyTimeInput(timeInput);
+                    // Auto-confirm when blurring (user clicked away)
+                    setTimeout(() => {
+                      if (isOpen) {
+                        handleConfirm();
+                      }
+                    }, 100);
                   }
                   // Format the display to show properly formatted time
                   setTimeInput(formatDisplayTime());
