@@ -17,10 +17,50 @@ export function InlineTimePicker({
   placeholder = "Select time",
   className = ""
 }: InlineTimePickerProps) {
+  // Parse initial value for proper initialization
+  const parseInitialValue = (val: string) => {
+    if (!val) return { hour: 9, minute: 0, period: 'AM' as 'AM' | 'PM' };
+    
+    const parts = val.split(':');
+    const hour24 = parseInt(parts[0] || '9', 10);
+    const minute = parseInt(parts[1] || '0', 10);
+    
+    if (isNaN(hour24) || isNaN(minute)) {
+      return { hour: 9, minute: 0, period: 'AM' as 'AM' | 'PM' };
+    }
+    
+    // For 24h format, use hour as-is
+    if (is24h) {
+      return { hour: hour24, minute, period: 'AM' as 'AM' | 'PM' };
+    }
+    
+    // Convert to 12h format for initial state
+    let hour12 = hour24;
+    let period: 'AM' | 'PM' = 'AM';
+    
+    if (hour24 === 0) {
+      hour12 = 12;
+      period = 'AM';
+    } else if (hour24 < 12) {
+      hour12 = hour24;
+      period = 'AM';
+    } else if (hour24 === 12) {
+      hour12 = 12;
+      period = 'PM';
+    } else {
+      hour12 = hour24 - 12;
+      period = 'PM';
+    }
+    
+    return { hour: hour12, minute, period };
+  };
+  
+  const initialState = parseInitialValue(value);
+  
   // Debug version - check console for input handling
-  const [selectedHour, setSelectedHour] = useState(9);
-  const [selectedMinute, setSelectedMinute] = useState(0);
-  const [selectedPeriod, setSelectedPeriod] = useState<'AM' | 'PM'>('AM');
+  const [selectedHour, setSelectedHour] = useState(initialState.hour);
+  const [selectedMinute, setSelectedMinute] = useState(initialState.minute);
+  const [selectedPeriod, setSelectedPeriod] = useState<'AM' | 'PM'>(initialState.period);
   const [timeInput, setTimeInput] = useState('');
   const [isInputMode, setIsInputMode] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -80,7 +120,7 @@ export function InlineTimePicker({
   }, [selectedHour, selectedMinute, selectedPeriod, is24h]);
 
   // Track the current format of selectedHour to prevent double conversion
-  const [hourFormat, setHourFormat] = useState<'12h' | '24h'>('12h');
+  const [hourFormat, setHourFormat] = useState<'12h' | '24h'>(is24h ? '24h' : '12h');
   
   // Handle format switching - convert hour between 12h and 24h
   useEffect(() => {
@@ -425,18 +465,13 @@ export function InlineTimePicker({
                 }}
                 onBlur={() => {
                   setIsInputMode(false);
-                  // Parse the input and update internal state
-                  if (timeInput) {
-                    parseAndApplyTimeInput(timeInput);
-                    // Auto-confirm when blurring (user clicked away)
-                    setTimeout(() => {
-                      if (isOpen) {
-                        handleConfirm();
-                      }
-                    }, 100);
+                  // Auto-confirm when blurring (user clicked away)
+                  if (timeInput && isOpen) {
+                    handleConfirm();
+                  } else {
+                    // Format the display to show properly formatted time
+                    setTimeInput(formatDisplayTime());
                   }
-                  // Format the display to show properly formatted time
-                  setTimeInput(formatDisplayTime());
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
