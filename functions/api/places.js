@@ -53,7 +53,7 @@ export async function onRequestGet(context) {
     geoapifyUrl.searchParams.set('apiKey', env.GEOAPIFY_API_KEY);
     geoapifyUrl.searchParams.set('limit', '8');
     geoapifyUrl.searchParams.set('format', 'json');
-    geoapifyUrl.searchParams.set('type', 'city,locality,district,neighbourhood');
+    geoapifyUrl.searchParams.set('type', 'city');
 
     const response = await fetch(geoapifyUrl.toString());
     
