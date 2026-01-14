@@ -72,4 +72,5 @@ jspm_packages/
 
 # Cloudflare
 .wrangler/
+wrangler.toml
 wrangler.toml.bak
