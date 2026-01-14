@@ -94,6 +94,27 @@ export const ARTICLE_LINKS: ArticleLink[] = [
     category: 'calculator',
     priority: 2,
   },
+  {
+    title: 'Shift Work Hours Calculator',
+    description: 'Track overnight shifts and rotating schedules accurately',
+    href: '/articles/shift-work-hours-calculator',
+    category: 'calculator',
+    priority: 4,
+  },
+  {
+    title: 'Freelancer Time Tracking',
+    description: 'Calculate billable hours and manage client projects',
+    href: '/articles/freelancer-time-tracking',
+    category: 'calculator',
+    priority: 4,
+  },
+  {
+    title: 'Timesheet Calculator',
+    description: 'Calculate weekly hours and decimal totals for payroll',
+    href: '/articles/timesheet-calculator',
+    category: 'calculator',
+    priority: 4,
+  },
 ];
 
 export const TOOL_LINKS: ToolLink[] = [

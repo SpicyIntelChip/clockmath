@@ -88,21 +88,23 @@ async function handlePlacesApi(request, env) {
 // Read the existing worker
 let workerContent = fs.readFileSync(workerPath, 'utf8');
 
-// Find the fetch handler and wrap it
-const originalExport = 'var ks={async fetch(e,t,r){';
-const wrappedExport = `${placesApiCode}
-var ks={async fetch(e,t,r){
+// Find the fetch handler pattern dynamically (variable name changes between builds)
+const fetchPattern = /var ([a-zA-Z_][a-zA-Z0-9_]*)=\{async fetch\(([a-zA-Z]),([a-zA-Z]),([a-zA-Z])\)\{/;
+const match = workerContent.match(fetchPattern);
+
+if (match) {
+  const [originalExport, varName, reqParam, envParam, ctxParam] = match;
+  const wrappedExport = `${placesApiCode}
+var ${varName}={async fetch(${reqParam},${envParam},${ctxParam}){
   // Check if this is a places API request
-  const reqUrl = new URL(e.url);
+  const reqUrl = new URL(${reqParam}.url);
   if (reqUrl.pathname === '/api/places' || reqUrl.pathname === '/api/places/') {
-    return handlePlacesApi(e, t);
+    return handlePlacesApi(${reqParam}, ${envParam});
   }
 `;
-
-if (workerContent.includes(originalExport)) {
   workerContent = workerContent.replace(originalExport, wrappedExport);
   fs.writeFileSync(workerPath, workerContent);
-  console.log('✅ Successfully injected places API into worker');
+  console.log(`✅ Successfully injected places API into worker (patched ${varName})`);
 } else {
   console.error('❌ Could not find worker export to patch');
   process.exit(1);
