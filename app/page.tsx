@@ -6,21 +6,25 @@ import SeoIntro from "@/components/SeoIntro"
 import SiteFooter from "@/components/SiteFooter"
 import PageChrome from "@/components/PageChrome"
 import { InlineTimePicker } from "@/components/ui/InlineTimePicker"
+import { InlineDatePicker } from "@/components/ui/InlineDatePicker"
 import { DetailedDurationBreakdown } from "@/components/DetailedDurationBreakdown"
+import { format } from "date-fns"
 import { event as gaEvent } from "@/lib/gtag"
 import JsonLd, { getSoftwareApplicationSchema } from "@/components/JsonLd"
 
 // Interface for calculator-specific data
 interface CalculationHistory {
   id: string
+  startDate: string  // ISO date string
   startTime: string
+  endDate: string    // ISO date string
   endTime: string
-  assumeNextDay: boolean
   result: string
   seconds?: number // Raw seconds value for efficient sum calculations (optional for backward compatibility)
   detailedResult?: {
     years: number
     months: number
+    weeks: number
     days: number
     hours: number
     minutes: number
@@ -38,9 +42,10 @@ function getDevice(): "mobile" | "desktop" {
 type StoredCalculation = Omit<CalculationHistory, "timestamp"> & { timestamp: string };
 
 export default function ClockMathPage() {
+  const [startDate, setStartDate] = useState<Date>(new Date())
   const [startTime, setStartTime] = useState("09:00:00")
+  const [endDate, setEndDate] = useState<Date>(new Date())
   const [endTime, setEndTime] = useState("17:30:00")
-  const [assumeNextDay, setAssumeNextDay] = useState(false)
   const [result, setResult] = useState("")
   const [history, setHistory] = useState<CalculationHistory[]>([])
   const [isDarkMode, setIsDarkMode] = useState(false)
@@ -50,6 +55,7 @@ export default function ClockMathPage() {
   const [currentDetailedResult, setCurrentDetailedResult] = useState<{
     years: number
     months: number
+    weeks: number
     days: number
     hours: number
     minutes: number
@@ -60,6 +66,7 @@ export default function ClockMathPage() {
     detailed: {
       years: number
       months: number
+      weeks: number
       days: number
       hours: number
       minutes: number
@@ -116,31 +123,69 @@ export default function ClockMathPage() {
 
   const formatDuration = useCallback((seconds: number): string => {
     if (isNaN(seconds) || seconds < 0) return "Invalid"
-    const hours = Math.floor(seconds / 3600)
-    const minutes = Math.floor((seconds % 3600) / 60)
-    const secs = seconds % 60
-    
+
+    const totalDays = Math.floor(seconds / 86400)
+    const totalHours = Math.floor(seconds / 3600)
+    const remainingHours = Math.floor((seconds % 86400) / 3600)
+    const remainingMinutes = Math.floor((seconds % 3600) / 60)
+    const remainingSecs = seconds % 60
+
+    // Less than a day: show hours, minutes, seconds
+    if (totalDays === 0) {
+      const parts = []
+      if (totalHours > 0) parts.push(`${totalHours}h`)
+      if (remainingMinutes > 0) parts.push(`${remainingMinutes}m`)
+      if (remainingSecs > 0 || parts.length === 0) parts.push(`${remainingSecs}s`)
+      return parts.join(" ")
+    }
+
+    // Less than a year: show days, hours, minutes
+    const totalYears = Math.floor(totalDays / 365)
+    const totalMonths = Math.floor(totalDays / 30.44)
+
+    if (totalYears === 0) {
+      if (totalMonths >= 1) {
+        // Show months and remaining days
+        const remainingDays = Math.floor(totalDays % 30.44)
+        const parts = []
+        parts.push(`${totalMonths} month${totalMonths !== 1 ? 's' : ''}`)
+        if (remainingDays > 0) parts.push(`${remainingDays} day${remainingDays !== 1 ? 's' : ''}`)
+        return parts.join(", ")
+      } else {
+        // Show days and hours
+        const parts = []
+        parts.push(`${totalDays} day${totalDays !== 1 ? 's' : ''}`)
+        if (remainingHours > 0) parts.push(`${remainingHours}h`)
+        if (remainingMinutes > 0 && totalDays < 7) parts.push(`${remainingMinutes}m`)
+        return parts.join(", ")
+      }
+    }
+
+    // Years: show years, months, days
+    const remainingMonths = Math.floor((totalDays % 365) / 30.44)
+    const remainingDays = Math.floor((totalDays % 365) % 30.44)
     const parts = []
-    if (hours > 0) parts.push(`${hours}h`)
-    if (minutes > 0) parts.push(`${minutes}m`)
-    if (secs > 0 || parts.length === 0) parts.push(`${secs}s`)
-    
-    return parts.join(" ")
+    parts.push(`${totalYears} year${totalYears !== 1 ? 's' : ''}`)
+    if (remainingMonths > 0) parts.push(`${remainingMonths} month${remainingMonths !== 1 ? 's' : ''}`)
+    if (remainingDays > 0) parts.push(`${remainingDays} day${remainingDays !== 1 ? 's' : ''}`)
+    return parts.join(", ")
   }, [])
 
   const formatDetailedDuration = useCallback((seconds: number) => {
     if (isNaN(seconds) || seconds < 0) return null
-    
+
     // Calculate all time units with appropriate precision
     const years = seconds / (365.25 * 24 * 3600)
     const months = seconds / (30.44 * 24 * 3600)
+    const weeks = seconds / (7 * 24 * 3600)
     const days = seconds / (24 * 3600)
     const hours = seconds / 3600
     const minutes = seconds / 60
-    
+
     return {
       years: parseFloat(years.toFixed(4)),
       months: parseFloat(months.toFixed(3)),
+      weeks: parseFloat(weeks.toFixed(2)),
       days: parseFloat(days.toFixed(2)),
       hours: parseFloat(hours.toFixed(2)),
       minutes: parseFloat(minutes.toFixed(1)),
@@ -249,42 +294,52 @@ export default function ClockMathPage() {
     // Simulate calculation delay for animation
     setTimeout(() => {
       const startSeconds = parseTimeToSeconds(startTime)
-      let endSeconds = parseTimeToSeconds(endTime)
-      
+      const endSeconds = parseTimeToSeconds(endTime)
+
       if (isNaN(startSeconds) || isNaN(endSeconds)) {
         setResult("Invalid time format")
         setIsCalculating(false)
         return
       }
-      
-      // If end is before start and assumeNextDay is true, add 24 hours to end
-      if (assumeNextDay) {
-        endSeconds += 24 * 3600
-      }
-      
-      const diffSeconds = endSeconds - startSeconds
-      
+
+      // Combine date and time into full datetime
+      const startDateTime = new Date(startDate)
+      startDateTime.setHours(Math.floor(startSeconds / 3600))
+      startDateTime.setMinutes(Math.floor((startSeconds % 3600) / 60))
+      startDateTime.setSeconds(startSeconds % 60)
+      startDateTime.setMilliseconds(0)
+
+      const endDateTime = new Date(endDate)
+      endDateTime.setHours(Math.floor(endSeconds / 3600))
+      endDateTime.setMinutes(Math.floor((endSeconds % 3600) / 60))
+      endDateTime.setSeconds(endSeconds % 60)
+      endDateTime.setMilliseconds(0)
+
+      const diffMs = endDateTime.getTime() - startDateTime.getTime()
+      const diffSeconds = Math.floor(diffMs / 1000)
+
       if (diffSeconds < 0) {
-        setResult("End time is before start time")
+        setResult("End is before start")
       } else {
         const duration = formatDuration(diffSeconds)
         const detailedDuration = formatDetailedDuration(diffSeconds)
         setResult(duration)
         setCurrentDetailedResult(detailedDuration)
-        
+
         // Add to history
         const newEntry: CalculationHistory = {
           id: Date.now().toString(),
+          startDate: format(startDate, 'yyyy-MM-dd'),
           startTime,
+          endDate: format(endDate, 'yyyy-MM-dd'),
           endTime,
-          assumeNextDay,
           result: duration,
           seconds: diffSeconds, // Store raw seconds for efficient sum calculations
           detailedResult: detailedDuration || undefined,
           timestamp: new Date()
         }
         setHistory(prev => [newEntry, ...prev.slice(0, 9)]) // Keep last 10
-        
+
         // Save to localStorage
         const storageEntry: StoredCalculation = {
           ...newEntry,
@@ -299,20 +354,22 @@ export default function ClockMathPage() {
         }
 
         // Analytics
+        const daysDiff = Math.floor(diffSeconds / 86400)
         gaEvent({
           action: "calculation_completed",
           params: {
             page: "calculator",
             duration_seconds: diffSeconds,
-            has_next_day: assumeNextDay,
+            duration_days: daysDiff,
+            is_multi_day: daysDiff > 0,
             device: getDevice(),
           },
         });
       }
-      
+
       setIsCalculating(false)
     }, 300)
-  }, [startTime, endTime, assumeNextDay, parseTimeToSeconds, formatDuration, formatDetailedDuration])
+  }, [startDate, startTime, endDate, endTime, parseTimeToSeconds, formatDuration, formatDetailedDuration])
 
   const toggleTheme = useCallback(() => {
     const newTheme = !isDarkMode
@@ -446,61 +503,55 @@ export default function ClockMathPage() {
               </div>
             </div>
 
-            {/* Time Inputs */}
+            {/* Date and Time Inputs */}
             <div className="grid sm:grid-cols-2 gap-4 sm:gap-6">
-              {/* Start Time */}
+              {/* Start */}
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-foreground dark:text-slate-100">
-                  Start Time
+                  Start
                 </label>
-                <InlineTimePicker
-                  value={startTime}
-                  onChange={setStartTime}
-                  is24h={is24HourFormat}
-                  placeholder="Select start time"
-                />
-              </div>
-
-              {/* End Time */}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-foreground dark:text-slate-100">
-                  End Time
-                </label>
-                <InlineTimePicker
-                  value={endTime}
-                  onChange={setEndTime}
-                  is24h={is24HourFormat}
-                  placeholder="Select end time"
-                />
-              </div>
-            </div>
-
-            {/* Next Day Option */}
-            <div className="flex items-center justify-center">
-              <label className="flex items-center gap-3 cursor-pointer group">
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    checked={assumeNextDay}
-                    onChange={(e) => setAssumeNextDay(e.target.checked)}
-                    className="sr-only"
-                  />
-                  <div className={`w-6 h-6 rounded-md border-2 transition-all duration-200 ${
-                    assumeNextDay
-                      ? "bg-primary border-primary"
-                      : "border-border dark:border-slate-600 group-hover:border-primary/50"
-                  }`}>
-                    {assumeNextDay && (
-                      <svg className="w-4 h-4 text-primary-foreground absolute top-0.5 left-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <polyline points="20,6 9,17 4,12" strokeWidth="2" />
-                      </svg>
-                    )}
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <InlineDatePicker
+                      value={startDate}
+                      onChange={setStartDate}
+                      placeholder="Select date"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <InlineTimePicker
+                      value={startTime}
+                      onChange={setStartTime}
+                      is24h={is24HourFormat}
+                      placeholder="Time"
+                    />
                   </div>
                 </div>
-                <span className="text-foreground dark:text-slate-100 font-medium group-hover:text-primary transition-colors">
-                  End time is next day
-                </span>
-              </label>
+              </div>
+
+              {/* End */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-foreground dark:text-slate-100">
+                  End
+                </label>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <InlineDatePicker
+                      value={endDate}
+                      onChange={setEndDate}
+                      placeholder="Select date"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <InlineTimePicker
+                      value={endTime}
+                      onChange={setEndTime}
+                      is24h={is24HourFormat}
+                      placeholder="Time"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Calculate Button */}
@@ -615,9 +666,30 @@ export default function ClockMathPage() {
                 const startTimeFormatted = formatTime(entry.startTime)
                 const endTimeFormatted = formatTime(entry.endTime)
                 const isExpanded = expandedHistory.has(entry.id)
-                
                 const isSelected = selectedCalculations.has(entry.id)
-                
+
+                // Format dates for display
+                const formatEntryDate = (dateStr: string | undefined) => {
+                  if (!dateStr) return null
+                  try {
+                    const date = new Date(dateStr)
+                    const today = new Date()
+                    const yesterday = new Date(today)
+                    yesterday.setDate(yesterday.getDate() - 1)
+
+                    if (dateStr === format(today, 'yyyy-MM-dd')) return 'Today'
+                    if (dateStr === format(yesterday, 'yyyy-MM-dd')) return 'Yesterday'
+                    return format(date, 'MMM d')
+                  } catch {
+                    return null
+                  }
+                }
+
+                const startDateFormatted = formatEntryDate(entry.startDate)
+                const endDateFormatted = formatEntryDate(entry.endDate)
+                const isSameDay = entry.startDate === entry.endDate
+                const isMultiDay = entry.startDate && entry.endDate && entry.startDate !== entry.endDate
+
                 return (
                   <div
                     key={entry.id}
@@ -649,8 +721,15 @@ export default function ClockMathPage() {
                         <span className="font-mono text-sm text-muted-foreground">
                           {startTimeFormatted && endTimeFormatted ? (
                             <>
-                              {startTimeFormatted} → {endTimeFormatted}
-                              {entry.assumeNextDay && " (+1 day)"}
+                              {isMultiDay && startDateFormatted && (
+                                <span className="text-xs text-primary/70 mr-1">{startDateFormatted}</span>
+                              )}
+                              {startTimeFormatted}
+                              <span className="mx-1">→</span>
+                              {isMultiDay && endDateFormatted && (
+                                <span className="text-xs text-primary/70 mr-1">{endDateFormatted}</span>
+                              )}
+                              {endTimeFormatted}
                             </>
                           ) : (
                             <span className="text-red-500 text-xs">
