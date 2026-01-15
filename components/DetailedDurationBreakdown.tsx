@@ -6,6 +6,7 @@
 interface DetailedDuration {
   years: number
   months: number
+  weeks?: number
   days: number
   hours: number
   minutes: number
@@ -60,6 +61,7 @@ export function DetailedDurationBreakdown({
   const timeUnits = [
     { value: detailedResult.years.toFixed(4), label: 'years' },
     { value: detailedResult.months.toFixed(3), label: 'months' },
+    ...(detailedResult.weeks !== undefined ? [{ value: detailedResult.weeks.toFixed(2), label: 'weeks' }] : []),
     { value: detailedResult.days.toFixed(2), label: 'days' },
     { value: detailedResult.hours.toFixed(2), label: 'hours' },
     { value: detailedResult.minutes.toFixed(1), label: 'minutes' },
