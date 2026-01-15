@@ -2,6 +2,7 @@ import Link from "next/link";
 import RelatedArticles from "./RelatedArticles";
 import ArticleAnalytics from "./ArticleAnalytics";
 import ArticleCtaLink from "./ArticleCtaLink";
+import JsonLd, { getArticleSchema } from "./JsonLd";
 
 interface ArticleLayoutProps {
   children: React.ReactNode;
@@ -22,6 +23,14 @@ export default function ArticleLayout({
 }: ArticleLayoutProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800/20">
+      <JsonLd
+        data={getArticleSchema({
+          headline: title,
+          description,
+          url: `https://clockmath.com${currentPath}`,
+          datePublished: `${publishDate}-01-01`,
+        })}
+      />
       <ArticleAnalytics title={title} category={category} currentPath={currentPath} />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(5,150,105,0.1),transparent_50%)] dark:bg-[radial-gradient(circle_at_50%_120%,rgba(5,150,105,0.2),transparent_50%)]"></div>
       

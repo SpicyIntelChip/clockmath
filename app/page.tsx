@@ -8,6 +8,7 @@ import PageChrome from "@/components/PageChrome"
 import { InlineTimePicker } from "@/components/ui/InlineTimePicker"
 import { DetailedDurationBreakdown } from "@/components/DetailedDurationBreakdown"
 import { event as gaEvent } from "@/lib/gtag"
+import JsonLd, { getSoftwareApplicationSchema } from "@/components/JsonLd"
 
 // Interface for calculator-specific data
 interface CalculationHistory {
@@ -376,6 +377,13 @@ export default function ClockMathPage() {
 
   return (
     <PageChrome currentTool="calculator" onToggleTheme={toggleTheme} isDarkMode={isDarkMode}>
+      <JsonLd
+        data={getSoftwareApplicationSchema({
+          name: 'ClockMath Time Duration Calculator',
+          description: 'Calculate the time difference between two times instantly. Handles overnight shifts, shows results in hours, minutes, seconds, and decimal formats.',
+          url: 'https://clockmath.com/',
+        })}
+      />
       <div className="space-y-8 pb-24">
         {/* Header */}
         <header className="text-center">
