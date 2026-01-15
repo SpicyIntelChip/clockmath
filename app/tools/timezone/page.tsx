@@ -8,6 +8,7 @@ import SiteFooter from '@/components/SiteFooter';
 import PageChrome from '@/components/PageChrome';
 import Link from 'next/link';
 import { Toaster } from '@/components/ui/toaster';
+import JsonLd, { getSoftwareApplicationSchema } from '@/components/JsonLd';
 
 export default function TimezonePage() {
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -37,6 +38,13 @@ export default function TimezonePage() {
   }, [isDarkMode]);
   return (
     <PageChrome currentTool="timezone" onToggleTheme={toggleDarkMode} isDarkMode={isDarkMode}>
+      <JsonLd
+        data={getSoftwareApplicationSchema({
+          name: 'ClockMath Timezone Converter',
+          description: 'Convert time between any timezone instantly. Auto-detects your location, supports all global timezones, and handles daylight saving time.',
+          url: 'https://clockmath.com/tools/timezone/',
+        })}
+      />
       <Toaster />
 
         {/* Header */}

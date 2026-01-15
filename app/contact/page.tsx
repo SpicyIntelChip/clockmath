@@ -5,6 +5,7 @@ import PageChrome from '@/components/PageChrome';
 import SiteFooter from '@/components/SiteFooter';
 import { generateSEOMetadata } from '@/lib/seo';
 import { event as gaEvent } from '@/lib/gtag';
+import JsonLd, { getFAQPageSchema } from '@/components/JsonLd';
 
 export default function ContactPage() {
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -217,6 +218,7 @@ export default function ContactPage() {
 
   return (
     <PageChrome currentTool="articles" onToggleTheme={toggleDarkMode} isDarkMode={isDarkMode}>
+      <JsonLd data={getFAQPageSchema(faqItems)} />
       {/* Header */}
       <header className="text-center mb-8 sm:mb-12">
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-4">
