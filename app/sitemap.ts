@@ -28,8 +28,8 @@ function getAllPages(dir: string, basePath: string = ''): string[] {
         pages.push(routePath);
       }
     }
-  } catch (error) {
-    console.warn(`Could not read directory ${dir}:`, error);
+  } catch {
+    // Directory not readable, return empty pages
   }
   
   return pages;

@@ -30,7 +30,6 @@ async function handlePlacesApi(request, env) {
   const apiKey = env.GEOAPIFY_API_KEY || env.GEOAPIFY_KEY || (globalThis.process?.env?.GEOAPIFY_API_KEY);
 
   if (!apiKey) {
-    console.error('GEOAPIFY_API_KEY not found in environment. Available keys:', Object.keys(env || {}));
     return new Response(
       JSON.stringify({ error: 'API configuration error', debug: Object.keys(env || {}).join(',') }),
       { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
@@ -76,7 +75,6 @@ async function handlePlacesApi(request, env) {
       { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600', ...corsHeaders } }
     );
   } catch (error) {
-    console.error('Places API error:', error);
     return new Response(
       JSON.stringify({ error: 'Failed to search locations', message: error?.message || String(error), results: [] }),
       { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
@@ -104,8 +102,6 @@ var ${varName}={async fetch(${reqParam},${envParam},${ctxParam}){
 `;
   workerContent = workerContent.replace(originalExport, wrappedExport);
   fs.writeFileSync(workerPath, workerContent);
-  console.log(`✅ Successfully injected places API into worker (patched ${varName})`);
 } else {
-  console.error('❌ Could not find worker export to patch');
   process.exit(1);
 }

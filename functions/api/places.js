@@ -33,7 +33,6 @@ export async function onRequestGet(context) {
 
   // Access the encrypted secret from Cloudflare environment
   if (!env.GEOAPIFY_API_KEY) {
-    console.error('GEOAPIFY_API_KEY not found in environment');
     return new Response(
       JSON.stringify({ error: 'API configuration error' }),
       { 
@@ -81,8 +80,7 @@ export async function onRequestGet(context) {
       }
     );
 
-  } catch (error) {
-    console.error('Places API error:', error);
+  } catch {
     return new Response(
       JSON.stringify({ 
         error: 'Failed to search locations',

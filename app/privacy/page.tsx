@@ -40,7 +40,7 @@ export default function PrivacyPage() {
             Back to Calculator
           </Link>
           <h1 className="text-4xl font-bold text-foreground dark:text-slate-100 mb-2">
-            🛡️ Privacy Policy
+            Privacy Policy
           </h1>
           <p className="text-muted-foreground dark:text-slate-400">
             ClockMath.com

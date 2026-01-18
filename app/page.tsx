@@ -259,13 +259,11 @@ export default function ClockMathPage() {
     
     // Handle edge case where timeStr might be an object or invalid data
     if (typeof timeStr !== 'string') {
-      console.warn('Invalid timeStr type:', typeof timeStr, timeStr)
       return ""
     }
     
     const parts = timeStr.split(":")
     if (parts.length < 2) {
-      console.warn('Invalid time format:', timeStr)
       return timeStr
     }
     
@@ -274,7 +272,6 @@ export default function ClockMathPage() {
     
     // Validate parsed values
     if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours >= 24 || minutes < 0 || minutes >= 60) {
-      console.warn('Invalid time values:', { hours, minutes, timeStr })
       return timeStr
     }
     
@@ -349,8 +346,8 @@ export default function ClockMathPage() {
           const existing = JSON.parse(localStorage.getItem("clockmath-history") || "[]")
           const updated = [storageEntry, ...existing.slice(0, 9)]
           localStorage.setItem("clockmath-history", JSON.stringify(updated))
-        } catch (e) {
-          console.warn("Failed to save to localStorage", e)
+        } catch {
+          // Silently fail if localStorage is unavailable
         }
 
         // Analytics
@@ -411,8 +408,7 @@ export default function ClockMathPage() {
         }))
         localStorage.setItem("clockmath-history", JSON.stringify(cleanedStorage))
       }
-    } catch (e) {
-      console.warn("Failed to load history from localStorage", e)
+    } catch {
       localStorage.removeItem("clockmath-history")
     }
   }, [])

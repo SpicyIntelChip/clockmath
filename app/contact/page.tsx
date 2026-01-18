@@ -68,7 +68,6 @@ export default function ContactPage() {
     try {
       // 1. Honeypot check - if filled, it's likely a bot
       if (honeypot.trim() !== '') {
-        console.log('Spam detected: honeypot filled');
         setSubmitStatus('error');
         setIsSubmitting(false);
         return;
@@ -77,7 +76,6 @@ export default function ContactPage() {
       // 2. Time-based check - too fast submissions are likely bots (minimum 3 seconds)
       const timeTaken = Date.now() - startTime;
       if (timeTaken < 3000) {
-        console.log('Spam detected: submission too fast');
         setSubmitStatus('error');
         setIsSubmitting(false);
         return;
@@ -85,7 +83,6 @@ export default function ContactPage() {
 
       // 3. Basic interaction check
       if (!hasInteracted) {
-        console.log('Spam detected: no user interaction');
         setSubmitStatus('error');
         setIsSubmitting(false);
         return;
@@ -97,7 +94,6 @@ export default function ContactPage() {
       const hasSpamContent = spamKeywords.some(keyword => messageText.includes(keyword));
       
       if (hasSpamContent) {
-        console.log('Spam detected: spam keywords found');
         setSubmitStatus('error');
         setIsSubmitting(false);
         return;
@@ -107,7 +103,6 @@ export default function ContactPage() {
       const urlRegex = /(https?:\/\/[^\s]+)/g;
       const urls = messageText.match(urlRegex) || [];
       if (urls.length > 2) {
-        console.log('Spam detected: too many URLs');
         setSubmitStatus('error');
         setIsSubmitting(false);
         return;
@@ -116,7 +111,6 @@ export default function ContactPage() {
       // 6. Email validation - check for valid email format and suspicious patterns
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(formData.email)) {
-        console.log('Spam detected: invalid email format');
         setSubmitStatus('error');
         setIsSubmitting(false);
         return;
@@ -128,7 +122,6 @@ export default function ContactPage() {
       const hasSuspiciousEmail = suspiciousEmailPatterns.some(pattern => emailLower.includes(pattern));
       
       if (hasSuspiciousEmail) {
-        console.log('Spam detected: suspicious email domain');
         setSubmitStatus('error');
         setIsSubmitting(false);
         return;
@@ -141,7 +134,6 @@ export default function ContactPage() {
         const minInterval = 5 * 60 * 1000; // 5 minutes minimum between submissions
         
         if (timeSinceLastSubmission < minInterval) {
-          console.log('Spam detected: too frequent submissions');
           setSubmitStatus('error');
           setIsSubmitting(false);
           return;
@@ -189,8 +181,7 @@ export default function ContactPage() {
         setSubmitStatus('idle');
       }, 3000);
 
-    } catch (error) {
-      console.error('Contact form error:', error);
+    } catch {
       setSubmitStatus('error');
     } finally {
       setIsSubmitting(false);
@@ -302,7 +293,7 @@ export default function ContactPage() {
           {submitStatus === 'success' && (
             <div className="mb-6 p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg">
               <p className="text-emerald-800 dark:text-emerald-200">
-                ✅ Your email client should have opened. If not, you can email us directly at{' '}
+                Your email client should have opened. If not, you can email us directly at{' '}
                 <a href="mailto:hello@clockmath.com" className="underline hover:no-underline">
                   hello@clockmath.com
                 </a>
@@ -313,7 +304,7 @@ export default function ContactPage() {
           {submitStatus === 'error' && (
             <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
               <p className="text-red-800 dark:text-red-200">
-                ❌ Unable to process your message. Please try again or email us directly at{' '}
+                Unable to process your message. Please try again or email us directly at{' '}
                 <a href="mailto:hello@clockmath.com" className="underline hover:no-underline">
                   hello@clockmath.com
                 </a>

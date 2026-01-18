@@ -27,7 +27,6 @@ const isAnalyticsBlocked = () => {
 
 export const pageview = (url: string) => {
   if (isAnalyticsBlocked()) {
-    console.log('🛡️ Pageview blocked:', url);
     return;
   }
   window.gtag?.("config", GA_MEASUREMENT_ID, {
@@ -37,7 +36,6 @@ export const pageview = (url: string) => {
 
 export const event = ({ action, params = {} }: GtagEvent) => {
   if (isAnalyticsBlocked()) {
-    console.log('🛡️ Event blocked:', action, params);
     return;
   }
   window.gtag?.("event", action, params);

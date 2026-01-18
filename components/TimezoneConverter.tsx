@@ -142,8 +142,7 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
           device: typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)')?.matches ? 'mobile' : 'desktop'
         }
       });
-    } catch (error) {
-      console.error('Error converting timezone:', error);
+    } catch {
       setResult(null);
     }
   }, [hour12, inputDate, inputTime]);
@@ -193,8 +192,7 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
         setInputTime(timeStr);
         // Recompute using the swapped zones and the carried-over time
         computeConversion(newFrom, newTo, { dateStr, timeStr });
-      } catch (error) {
-        console.warn('Failed to reuse swapped result timestamp:', error);
+      } catch {
         computeConversion(newFrom, newTo);
       }
     } else {
@@ -229,8 +227,7 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
             action: 'tz_geolocation_used',
             params: { device: typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)')?.matches ? 'mobile' : 'desktop' }
           });
-        } catch (error) {
-          console.error('Error processing location:', error);
+        } catch {
           toast({
             title: 'Location error',
             description: 'Error processing your location.',
@@ -239,7 +236,6 @@ export function TimezoneConverter({ className = '' }: TimezoneConverterProps) {
         }
       },
       (error) => {
-        console.error('Geolocation error:', error);
         switch (error.code) {
           case error.PERMISSION_DENIED:
             toast({

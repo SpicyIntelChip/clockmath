@@ -49,8 +49,7 @@ function supportedTimeZones(): string[] {
       'Europe/Moscow',
       'Asia/Istanbul'
     ].sort();
-  } catch (error) {
-    console.warn('Error getting supported timezones:', error);
+  } catch {
     return ['UTC'];
   }
 }
@@ -101,8 +100,7 @@ export function getOffsetLabel(timeZone: string, at: Date = new Date()): string 
     const sign = offsetMinutes >= 0 ? '+' : '-';
     
     return `UTC${sign}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-  } catch (error) {
-    console.warn('Error getting offset label for timezone:', timeZone, error);
+  } catch {
     return 'UTC+00:00';
   }
 }
@@ -198,8 +196,7 @@ export function formatZoned(
       date: dateFormatter.format(date),
       weekday: weekdayFormatter.format(date)
     };
-  } catch (error) {
-    console.warn('Error formatting zoned time:', error);
+  } catch {
     return {
       time: date.toLocaleTimeString('en-US'),
       date: date.toLocaleDateString('en-US'),
@@ -230,8 +227,7 @@ export function convertDateBetweenZones({
     // We just need to return it as-is since Date objects are timezone-agnostic
     // The formatting functions will handle the timezone display
     return new Date(at);
-  } catch (error) {
-    console.warn('Error converting between zones:', error);
+  } catch {
     return new Date(at);
   }
 }
@@ -312,8 +308,7 @@ export function parseDateTimeInZone(
 
     return candidate;
     
-  } catch (error) {
-    console.warn('Error parsing datetime in zone:', error);
+  } catch {
     return new Date();
   }
 }
