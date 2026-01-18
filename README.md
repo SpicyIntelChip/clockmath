@@ -43,7 +43,7 @@ Free online time calculators and timezone conversion tools.
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/clockmath.git
+git clone https://github.com/SpicyIntelChip/clockmath.git
 cd clockmath
 
 # Install dependencies

@@ -1,5 +1,5 @@
 // lib/gtag.ts
-export const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_ID || "G-5L3QN6938D";
+export const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_ID || "";
 
 type GtagEvent = {
   action: string;
